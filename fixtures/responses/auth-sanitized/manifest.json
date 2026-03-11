@@ -1,0 +1,39 @@
+{
+  "fixtures": [
+    {
+      "file": "account-list.json",
+      "url": "https://wts-api.tossinvest.com/api/v1/account/list",
+      "method": "GET"
+    },
+    {
+      "file": "asset-overview.json",
+      "url": "https://wts-cert-api.tossinvest.com/api/v3/my-assets/summaries/markets/all/overview",
+      "method": "GET"
+    },
+    {
+      "file": "pending-orders.json",
+      "url": "https://wts-cert-api.tossinvest.com/api/v1/trading/orders/histories/all/pending",
+      "method": "GET"
+    },
+    {
+      "file": "cached-orderable-amount.json",
+      "url": "https://wts-cert-api.tossinvest.com/api/v1/dashboard/common/cached-orderable-amount",
+      "method": "GET"
+    },
+    {
+      "file": "withdrawable-kr.json",
+      "url": "https://wts-api.tossinvest.com/api/v1/my-assets/summaries/markets/kr/withdrawable-amount",
+      "method": "GET"
+    },
+    {
+      "file": "withdrawable-us.json",
+      "url": "https://wts-api.tossinvest.com/api/v1/my-assets/summaries/markets/us/withdrawable-amount",
+      "method": "GET"
+    },
+    {
+      "file": "asset-sections-v2.json",
+      "url": "https://wts-cert-api.tossinvest.com/api/v2/dashboard/asset/sections/all",
+      "method": "POST"
+    }
+  ]
+}

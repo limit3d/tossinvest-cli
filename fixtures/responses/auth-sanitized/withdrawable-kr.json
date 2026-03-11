@@ -1,0 +1,21 @@
+{
+  "result": {
+    "amount0": {
+      "krw": 0.0,
+      "usd": null
+    },
+    "date0": "2026-03-11",
+    "amount1": {
+      "krw": 0.0,
+      "usd": null
+    },
+    "date1": "2026-03-12",
+    "amount2": {
+      "krw": 0.0,
+      "usd": null
+    },
+    "date2": "2026-03-13",
+    "amount3": null,
+    "date3": null
+  }
+}

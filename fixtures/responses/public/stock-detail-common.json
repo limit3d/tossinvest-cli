@@ -1,0 +1,27 @@
+{
+  "result": {
+    "name": "삼성전자",
+    "detailName": "삼성전자",
+    "guid": "KR7005930003",
+    "symbol": "005930",
+    "marketCode": "KSP",
+    "tradingSuspended": false,
+    "prevListDate": null,
+    "listDate": "1975-06-11",
+    "isUnlisted": false,
+    "companyCode": "005930",
+    "badges": [],
+    "notices": [],
+    "daytimePriceSupported": false,
+    "optionSupported": false,
+    "marginRate": 0.5,
+    "marginText": "현금 50%",
+    "marginLandingPath": "/margin-trading/onboarding/guide/v2?marginRate=0.5&equityLoanRate=0.00&stockName=삼성전자",
+    "equityLoanAvailable": false,
+    "nxtSupported": true,
+    "nxtTradingSuspended": false,
+    "memoCount": null,
+    "nxtOpenDate": "2025-03-24",
+    "nxtOpenDateRecent": "2025-03-24"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "symbol": "A005930",
+  "fixtures": [
+    {
+      "file": "guest-init.json",
+      "url": "https://wts-api.tossinvest.com/api/v3/init?tabId=tab-bootstrap"
+    },
+    {
+      "file": "dashboard-trading-info.json",
+      "url": "https://wts-info-api.tossinvest.com/api/v1/dashboard/wts/overview/trading-info"
+    },
+    {
+      "file": "stock-info.json",
+      "url": "https://wts-info-api.tossinvest.com/api/v2/stock-infos/A005930"
+    },
+    {
+      "file": "stock-detail-common.json",
+      "url": "https://wts-info-api.tossinvest.com/api/v1/stock-detail/ui/A005930/common"
+    },
+    {
+      "file": "stock-price.json",
+      "url": "https://wts-info-api.tossinvest.com/api/v1/product/stock-prices?meta=true&productCodes=A005930"
+    },
+    {
+      "file": "chart-day-1.json",
+      "url": "https://wts-info-api.tossinvest.com/api/v1/c-chart/kr-s/A005930/day:1?count=61&session=all&investMode=integrated&useAdjustedRate=true"
+    }
+  ]
+}

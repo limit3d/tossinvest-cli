@@ -1,0 +1,12 @@
+{
+  "result": {
+    "orderableAmountKr": {
+      "krw": 0,
+      "usd": null
+    },
+    "orderableAmountUs": {
+      "krw": 14,
+      "usd": 0.01
+    }
+  }
+}

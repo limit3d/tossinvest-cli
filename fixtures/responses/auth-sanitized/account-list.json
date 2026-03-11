@@ -1,0 +1,30 @@
+{
+  "result": {
+    "accountList": [
+      {
+        "accountNo": "<REDACTED>",
+        "key": "1",
+        "name": "<REDACTED>",
+        "displayName": "<REDACTED>",
+        "icon": "https://static.toss.im/icons/png/4x/icon-toss-logo-simple.png",
+        "type": "위탁",
+        "markets": [
+          "KR_STOCK",
+          "US_STOCK",
+          "US_BOND"
+        ],
+        "buyMarkets": [
+          "KR_STOCK",
+          "US_STOCK",
+          "US_BOND"
+        ],
+        "sellMarkets": [
+          "KR_STOCK",
+          "US_STOCK",
+          "US_BOND"
+        ]
+      }
+    ],
+    "primaryKey": "1"
+  }
+}

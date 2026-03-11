@@ -1,0 +1,235 @@
+package client
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+
+	"github.com/junghoonkye/toss-investment-cli/internal/domain"
+)
+
+type accountListEnvelope struct {
+	Result struct {
+		AccountList []struct {
+			AccountNo   string   `json:"accountNo"`
+			Key         string   `json:"key"`
+			Name        string   `json:"name"`
+			DisplayName string   `json:"displayName"`
+			Type        string   `json:"type"`
+			Markets     []string `json:"markets"`
+			BuyMarkets  []string `json:"buyMarkets"`
+			SellMarkets []string `json:"sellMarkets"`
+		} `json:"accountList"`
+		PrimaryKey string `json:"primaryKey"`
+	} `json:"result"`
+}
+
+type accountSummaryEnvelope struct {
+	Result struct {
+		AccountNo             string                           `json:"accountNo"`
+		TotalAssetAmount      float64                          `json:"totalAssetAmount"`
+		EvaluatedProfitAmount float64                          `json:"evaluatedProfitAmount"`
+		ProfitRate            float64                          `json:"profitRate"`
+		OverviewByMarket      map[string]accountMarketOverview `json:"overviewByMarket"`
+	} `json:"result"`
+}
+
+type accountMarketOverview struct {
+	Market                string  `json:"market"`
+	AccountNo             string  `json:"accountNo"`
+	PendingBuyOrderAmount float64 `json:"pendingBuyOrderAmount"`
+	EvaluatedAmount       float64 `json:"evaluatedAmount"`
+	PrincipalAmount       float64 `json:"principalAmount"`
+	EvaluatedProfitAmount float64 `json:"evaluatedProfitAmount"`
+	ProfitRate            float64 `json:"profitRate"`
+	TotalAssetAmount      float64 `json:"totalAssetAmount"`
+	OrderableAmount       struct {
+		KRW *float64 `json:"krw"`
+		USD *float64 `json:"usd"`
+	} `json:"orderableAmount"`
+}
+
+type orderableAmountEnvelope struct {
+	Result struct {
+		OrderableAmountKr struct {
+			KRW *float64 `json:"krw"`
+			USD *float64 `json:"usd"`
+		} `json:"orderableAmountKr"`
+		OrderableAmountUs struct {
+			KRW *float64 `json:"krw"`
+			USD *float64 `json:"usd"`
+		} `json:"orderableAmountUs"`
+	} `json:"result"`
+}
+
+type withdrawableAmountEnvelope struct {
+	Result map[string]any `json:"result"`
+}
+
+type pendingOrdersEnvelope struct {
+	Result []json.RawMessage `json:"result"`
+}
+
+func (c *Client) ListAccounts(ctx context.Context) ([]domain.Account, string, error) {
+	if err := c.requireSession(); err != nil {
+		return nil, "", err
+	}
+
+	var envelope accountListEnvelope
+	if err := c.getJSON(ctx, c.apiBaseURL+"/api/v1/account/list", &envelope); err != nil {
+		return nil, "", err
+	}
+
+	accounts := make([]domain.Account, 0, len(envelope.Result.AccountList))
+	for _, item := range envelope.Result.AccountList {
+		accounts = append(accounts, domain.Account{
+			ID:          item.Key,
+			DisplayName: item.DisplayName,
+			Name:        item.Name,
+			Type:        item.Type,
+			Markets:     item.Markets,
+			Primary:     item.Key == envelope.Result.PrimaryKey,
+		})
+	}
+
+	return accounts, envelope.Result.PrimaryKey, nil
+}
+
+func (c *Client) GetAccountSummary(ctx context.Context) (domain.AccountSummary, error) {
+	if err := c.requireSession(); err != nil {
+		return domain.AccountSummary{}, err
+	}
+
+	var overview accountSummaryEnvelope
+	if err := c.getJSON(ctx, c.certBaseURL+"/api/v3/my-assets/summaries/markets/all/overview", &overview); err != nil {
+		return domain.AccountSummary{}, err
+	}
+
+	var orderable orderableAmountEnvelope
+	if err := c.getJSON(ctx, c.certBaseURL+"/api/v1/dashboard/common/cached-orderable-amount", &orderable); err != nil {
+		return domain.AccountSummary{}, err
+	}
+
+	krWithdraw, err := c.getWithdrawable(ctx, c.apiBaseURL+"/api/v1/my-assets/summaries/markets/kr/withdrawable-amount")
+	if err != nil {
+		return domain.AccountSummary{}, err
+	}
+	usWithdraw, err := c.getWithdrawable(ctx, c.apiBaseURL+"/api/v1/my-assets/summaries/markets/us/withdrawable-amount")
+	if err != nil {
+		return domain.AccountSummary{}, err
+	}
+
+	summary := domain.AccountSummary{
+		TotalAssetAmount:      overview.Result.TotalAssetAmount,
+		EvaluatedProfitAmount: overview.Result.EvaluatedProfitAmount,
+		ProfitRate:            overview.Result.ProfitRate,
+		OrderableAmountKRW:    pointerFloat(orderable.Result.OrderableAmountKr.KRW),
+		OrderableAmountUSD:    pointerFloat(orderable.Result.OrderableAmountUs.USD),
+		WithdrawableKR:        krWithdraw,
+		WithdrawableUS:        usWithdraw,
+		Markets:               map[string]domain.AccountMarketSummary{},
+	}
+
+	for key, item := range overview.Result.OverviewByMarket {
+		summary.Markets[key] = domain.AccountMarketSummary{
+			Market:                item.Market,
+			PendingBuyOrderAmount: item.PendingBuyOrderAmount,
+			EvaluatedAmount:       item.EvaluatedAmount,
+			PrincipalAmount:       item.PrincipalAmount,
+			EvaluatedProfitAmount: item.EvaluatedProfitAmount,
+			ProfitRate:            item.ProfitRate,
+			TotalAssetAmount:      item.TotalAssetAmount,
+			OrderableAmountKRW:    pointerFloat(item.OrderableAmount.KRW),
+			OrderableAmountUSD:    pointerFloat(item.OrderableAmount.USD),
+		}
+	}
+
+	return summary, nil
+}
+
+func (c *Client) ListPendingOrders(ctx context.Context) ([]domain.Order, error) {
+	if err := c.requireSession(); err != nil {
+		return nil, err
+	}
+
+	var envelope pendingOrdersEnvelope
+	if err := c.getJSON(ctx, c.certBaseURL+"/api/v1/trading/orders/histories/all/pending", &envelope); err != nil {
+		return nil, err
+	}
+
+	orders := make([]domain.Order, 0, len(envelope.Result))
+	for _, item := range envelope.Result {
+		orders = append(orders, domain.Order{Raw: item})
+	}
+
+	return orders, nil
+}
+
+func (c *Client) getWithdrawable(ctx context.Context, endpoint string) (map[string]any, error) {
+	var envelope withdrawableAmountEnvelope
+	if err := c.getJSON(ctx, endpoint, &envelope); err != nil {
+		return nil, err
+	}
+	return envelope.Result, nil
+}
+
+func pointerFloat(value *float64) float64 {
+	if value == nil {
+		return 0
+	}
+	return *value
+}
+
+func (c *Client) getJSON(ctx context.Context, endpoint string, target any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return err
+	}
+	c.applySession(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return newStatusError(resp.StatusCode, endpoint)
+	}
+
+	return json.NewDecoder(resp.Body).Decode(target)
+}
+
+func (c *Client) ValidateSession(ctx context.Context) error {
+	if err := c.requireSession(); err != nil {
+		return err
+	}
+
+	var envelope accountListEnvelope
+	return c.getJSON(ctx, c.apiBaseURL+"/api/v1/account/list", &envelope)
+}
+
+func (c *Client) requireSession() error {
+	if c.session == nil || len(c.session.Cookies) == 0 {
+		return ErrNoSession
+	}
+
+	return nil
+}
+
+func (c *Client) applySession(req *http.Request) {
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Referer", "https://www.tossinvest.com/account")
+
+	if c.session == nil {
+		return
+	}
+
+	for name, value := range c.session.Cookies {
+		req.AddCookie(&http.Cookie{Name: name, Value: value})
+	}
+
+	for name, value := range c.session.Headers {
+		req.Header.Set(name, value)
+	}
+}

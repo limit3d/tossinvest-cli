@@ -1,0 +1,166 @@
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+from pathlib import Path
+
+
+DEFAULT_URL = "https://www.tossinvest.com/account"
+REQUIRED_COOKIE_NAMES = {
+    "SESSION",
+    "XSRF-TOKEN",
+    "UTK",
+    "LTK",
+    "FTK",
+    "browserSessionId",
+}
+REQUIRED_LOCAL_STORAGE_KEYS = {
+    "WTS-DEVICE-ID",
+    "login-method",
+    "DEVICE_INFO",
+}
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m tossctl_auth_helper",
+        description="Browser-assisted login helper for tossctl.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    login_parser = subparsers.add_parser(
+        "login",
+        help="Open a real browser and capture Toss Securities storage state.",
+    )
+    login_parser.add_argument(
+        "--storage-state",
+        required=True,
+        help="Path where Playwright storage state JSON will be written.",
+    )
+    login_parser.add_argument(
+        "--url",
+        default=DEFAULT_URL,
+        help=f"Login entry URL. Defaults to {DEFAULT_URL}.",
+    )
+    login_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=300,
+        help="How long to wait for the user to complete login.",
+    )
+
+    return parser
+
+
+def emit(payload: dict) -> int:
+    json.dump(payload, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+    return 0
+
+
+def log(message: str) -> None:
+    sys.stderr.write(message + "\n")
+    sys.stderr.flush()
+
+
+def local_storage_keys(storage_state: dict) -> set[str]:
+    for origin in storage_state.get("origins", []):
+        if origin.get("origin") != "https://www.tossinvest.com":
+            continue
+        return {item["name"] for item in origin.get("localStorage", [])}
+    return set()
+
+
+def command_login(args: argparse.Namespace) -> int:
+    try:
+        from playwright.sync_api import Error as PlaywrightError
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return emit(
+            {
+                "status": "error",
+                "message": "python package 'playwright' is required. Install it with 'pip install playwright' and then run 'python -m playwright install chromium'.",
+            }
+        )
+
+    storage_state_path = Path(args.storage_state).expanduser().resolve()
+    storage_state_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=False)
+            context = browser.new_context()
+            page = context.new_page()
+            log("Opened browser for Toss Securities login.")
+            page.goto(args.url, wait_until="domcontentloaded")
+            log("Complete QR login in the browser window. The helper will continue after account cookies appear.")
+
+            deadline = time.monotonic() + args.timeout_seconds
+            while time.monotonic() < deadline:
+                storage_state = context.storage_state()
+                cookies = {cookie["name"]: cookie["value"] for cookie in storage_state.get("cookies", [])}
+                storage_keys = local_storage_keys(storage_state)
+                current_url = page.url
+
+                if (
+                    REQUIRED_COOKIE_NAMES.issubset(cookies.keys())
+                    and REQUIRED_LOCAL_STORAGE_KEYS.issubset(storage_keys)
+                    and "signin" not in current_url
+                ):
+                    page.wait_for_timeout(1500)
+                    storage_state = context.storage_state()
+                    storage_state_path.write_text(
+                        json.dumps(storage_state, indent=2),
+                        encoding="utf-8",
+                    )
+                    browser.close()
+                    return emit(
+                        {
+                            "status": "ok",
+                            "message": "Captured authenticated Toss Securities storage state.",
+                            "storage_state_path": str(storage_state_path),
+                            "cookie_count": len(cookies),
+                            "origin_count": len(storage_state.get("origins", [])),
+                        }
+                    )
+
+                page.wait_for_timeout(1000)
+
+            browser.close()
+            return emit(
+                {
+                    "status": "error",
+                    "message": (
+                        f"Timed out after {args.timeout_seconds} seconds waiting for login to complete. "
+                        "A full authenticated web session was not observed."
+                    ),
+                }
+            )
+    except PlaywrightError as exc:
+        message = str(exc)
+        if "Executable doesn't exist" in message:
+            message = (
+                "Playwright browser is not installed. Run 'python -m playwright install chromium' and try again."
+            )
+        return emit({"status": "error", "message": message})
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if args.command == "login":
+        result = command_login(args)
+        if result != 0:
+            return result
+        return 0
+
+    return emit(
+        {
+            "status": "error",
+            "message": f"Unsupported command: {args.command}",
+        }
+    )

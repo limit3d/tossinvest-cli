@@ -1,0 +1,24 @@
+{
+  "result": {
+    "data": [
+      {
+        "key": "all",
+        "name": "전체",
+        "marketOpen": null,
+        "currentMarketTradingHour": null
+      },
+      {
+        "key": "kr",
+        "name": "국내",
+        "marketOpen": true,
+        "currentMarketTradingHour": "정규장"
+      },
+      {
+        "key": "us",
+        "name": "해외",
+        "marketOpen": true,
+        "currentMarketTradingHour": "데이마켓"
+      }
+    ]
+  }
+}
