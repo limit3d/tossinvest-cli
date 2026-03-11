@@ -24,6 +24,7 @@ type rootOptions struct {
 type appContext struct {
 	format            output.Format
 	paths             config.Paths
+	loginConfig       auth.LoginConfig
 	authService       *auth.Service
 	client            *tossclient.Client
 	permissionService *permissions.Service
@@ -65,6 +66,8 @@ func newRootCmd() *cobra.Command {
 	)
 
 	cmd.AddCommand(
+		newVersionCmd(opts),
+		newDoctorCmd(opts),
 		newAuthCmd(opts),
 		newAccountCmd(opts),
 		newPortfolioCmd(opts),
@@ -112,6 +115,7 @@ func newAppContext(opts *rootOptions) (*appContext, error) {
 	return &appContext{
 		format: format,
 		paths:  paths,
+		loginConfig: loginConfig,
 		authService: auth.NewService(store, paths.SessionFile, auth.Options{
 			LoginConfig: loginConfig,
 			Validator:   client,

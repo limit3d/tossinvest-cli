@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/junghoonkye/tossinvest-cli/internal/auth"
+	"github.com/junghoonkye/tossinvest-cli/internal/doctor"
 	"github.com/junghoonkye/tossinvest-cli/internal/output"
 	"github.com/junghoonkye/tossinvest-cli/internal/session"
 	"github.com/spf13/cobra"
@@ -85,6 +86,28 @@ func newAuthCmd(opts *rootOptions) *cobra.Command {
 				}
 
 				return writeLogoutResult(cmd.OutOrStdout(), app.format, app.paths.SessionFile, cleared)
+			},
+		},
+		&cobra.Command{
+			Use:   "doctor",
+			Short: "Check whether auth login prerequisites are ready",
+			RunE: func(cmd *cobra.Command, _ []string) error {
+				app, err := newAppContext(opts)
+				if err != nil {
+					return err
+				}
+
+				report, err := doctor.NewService(
+					app.paths,
+					app.loginConfig,
+					app.authService,
+					app.permissionService,
+				).RunAuth(cmd.Context())
+				if err != nil {
+					return err
+				}
+
+				return output.WriteAuthDoctorReport(cmd.OutOrStdout(), app.format, report)
 			},
 		},
 	)

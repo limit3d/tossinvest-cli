@@ -1,13 +1,19 @@
 BINARY := bin/tossctl
+VERSION ?= dev
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+LDFLAGS := -X github.com/junghoonkye/tossinvest-cli/internal/version.Version=$(VERSION) \
+	-X github.com/junghoonkye/tossinvest-cli/internal/version.Commit=$(COMMIT) \
+	-X github.com/junghoonkye/tossinvest-cli/internal/version.Date=$(DATE)
 
 .PHONY: build run test fmt tidy clean
 
 build:
 	mkdir -p bin
-	go build -o $(BINARY) ./cmd/tossctl
+	go build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/tossctl
 
 run:
-	go run ./cmd/tossctl
+	go run -ldflags "$(LDFLAGS)" ./cmd/tossctl
 
 test:
 	go test ./...
@@ -20,4 +26,3 @@ tidy:
 
 clean:
 	rm -rf bin coverage.out
-

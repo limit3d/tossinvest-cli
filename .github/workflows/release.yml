@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goarch: arm64
+            asset: tossctl-darwin-arm64
+          - goarch: amd64
+            asset: tossctl-darwin-amd64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: darwin
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p dist/${{ matrix.asset }}
+          VERSION="${GITHUB_REF_NAME#v}"
+          COMMIT="${GITHUB_SHA::7}"
+          DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          go build \
+            -trimpath \
+            -ldflags "-X github.com/junghoonkye/tossinvest-cli/internal/version.Version=${VERSION} -X github.com/junghoonkye/tossinvest-cli/internal/version.Commit=${COMMIT} -X github.com/junghoonkye/tossinvest-cli/internal/version.Date=${DATE}" \
+            -o dist/${{ matrix.asset }}/tossctl \
+            ./cmd/tossctl
+
+      - name: Bundle auth helper
+        run: cp -R auth-helper dist/${{ matrix.asset }}/auth-helper
+
+      - name: Package artifact
+        run: |
+          tar -C dist/${{ matrix.asset }} -czf dist/${{ matrix.asset }}.tar.gz tossctl auth-helper
+          shasum -a 256 dist/${{ matrix.asset }}.tar.gz > dist/${{ matrix.asset }}.tar.gz.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: |
+            dist/${{ matrix.asset }}.tar.gz
+            dist/${{ matrix.asset }}.tar.gz.sha256
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [build-macos]
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/tossctl-darwin-arm64.tar.gz
+            dist/tossctl-darwin-arm64.tar.gz.sha256
+            dist/tossctl-darwin-amd64.tar.gz
+            dist/tossctl-darwin-amd64.tar.gz.sha256
+
+  update-homebrew-tap:
+    runs-on: ubuntu-latest
+    needs: [release]
+    steps:
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+
+      - name: Fetch Homebrew token
+        id: doppler
+        run: |
+          set -euo pipefail
+          TOKEN=$(doppler secrets get HOMEBREW_TAP_TOKEN --plain 2>/dev/null)
+          if [ -z "$TOKEN" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN not found in Doppler"
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "HOMEBREW_TAP_TOKEN=$TOKEN" >> "$GITHUB_OUTPUT"
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Compute metadata
+        id: meta
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARM_SHA=$(awk '{print $1}' dist/tossctl-darwin-arm64.tar.gz.sha256)
+          X86_SHA=$(awk '{print $1}' dist/tossctl-darwin-amd64.tar.gz.sha256)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "arm_sha=$ARM_SHA" >> "$GITHUB_OUTPUT"
+          echo "x86_sha=$X86_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: JungHoonGhae/homebrew-tossinvest-cli
+          token: ${{ steps.doppler.outputs.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Checkout source for formula rendering
+        uses: actions/checkout@v4
+        with:
+          path: src
+
+      - name: Update formula
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          ARM_SHA: ${{ steps.meta.outputs.arm_sha }}
+          X86_SHA: ${{ steps.meta.outputs.x86_sha }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          chmod +x src/tools/render_homebrew_formula.sh
+          src/tools/render_homebrew_formula.sh tap/Formula/tossctl.rb
+
+      - name: Commit and push formula update
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/tossctl.rb
+          if git diff --cached --quiet; then
+            echo "No formula changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: update tossctl ${VERSION}"
+          git push

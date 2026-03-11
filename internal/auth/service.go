@@ -57,7 +57,7 @@ func DefaultLoginConfig(cacheDir string) LoginConfig {
 
 	helperDir := os.Getenv("TOSSCTL_AUTH_HELPER_DIR")
 	if helperDir == "" {
-		helperDir = "auth-helper"
+		helperDir = resolveDefaultHelperDir()
 	}
 
 	storageStatePath := os.Getenv("TOSSCTL_AUTH_STORAGE_STATE")
@@ -70,6 +70,30 @@ func DefaultLoginConfig(cacheDir string) LoginConfig {
 		HelperDir:        helperDir,
 		StorageStatePath: storageStatePath,
 	}
+}
+
+func resolveDefaultHelperDir() string {
+	candidates := []string{"auth-helper"}
+
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		candidates = append(candidates,
+			filepath.Join(exeDir, "auth-helper"),
+			filepath.Join(exeDir, "..", "libexec", "auth-helper"),
+			filepath.Join(exeDir, "..", "share", "tossctl", "auth-helper"),
+		)
+	}
+
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+	}
+
+	return candidates[0]
 }
 
 func NewService(store session.Store, sessionFile string, opts Options) *Service {

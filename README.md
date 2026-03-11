@@ -1,48 +1,124 @@
 # tossinvest-cli
 
-Unofficial CLI for Toss Securities web workflows.
+[![GitHub stars](https://img.shields.io/github/stars/JungHoonGhae/tossinvest-cli)](https://github.com/JungHoonGhae/tossinvest-cli/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)](https://go.dev/)
+[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/JungHoonGhae/tossinvest-cli)
+[![CI](https://github.com/JungHoonGhae/tossinvest-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/JungHoonGhae/tossinvest-cli/actions/workflows/ci.yml)
 
-Project name: `tossinvest-cli`  
-CLI binary: `tossctl`
+토스증권 웹 세션을 재사용해 조회와 제한된 거래 워크플로를 터미널에서 다루기 위한 비공식 CLI입니다. 실행 바이너리는 `tossctl`입니다.
 
-## Status
+> **주의**: 이 프로젝트는 토스증권 공식 제품이 아닙니다. 웹 내부 API는 예고 없이 바뀔 수 있고, 잘못 쓰면 실제 계좌에 영향을 줄 수 있습니다.
 
-The project is past the initial scaffold stage.
+## 왜 이걸 만들었나
 
-Working today:
+내가 직접 쓰려고 만들었습니다.
 
-- browser-assisted login with reusable local session storage
-- read-only account, portfolio, orders, watchlist, and quote commands
-- live trading beta for a narrow slice:
-  - `US`
-  - `buy`
-  - `limit`
+토스증권 웹은 사람이 쓰기에는 편하지만, 아래 같은 흐름은 CLI가 더 잘 맞습니다.
+
+- 계좌 상태를 읽기
+- 시세와 미체결 주문을 확인하기
+- 조건이 맞으면 주문을 준비하거나 실행하기
+- 결과를 다른 시스템으로 넘기기
+
+AI 시대에는 이런 흐름이 점점 더 많아집니다. 앱이 사람만 쓰는 UI로 끝나는 것이 아니라, 자동화 도구가 안정적으로 호출할 수 있는 방식도 함께 가져야 한다고 봅니다.
+
+`tossinvest-cli`는 그 맥락에서 토스증권 웹을 `조회`, `주문 전 확인`, `제한된 주문 실행`이 가능한 CLI로 정리하려는 시도입니다.
+
+## 어떤 식으로 쓰는 도구인가
+
+이 프로젝트는 거대한 금융 플랫폼을 만들려는 쪽보다는, 토스증권에 대해 좁고 분명한 실행 인터페이스를 제공하는 쪽에 가깝습니다.
+
+예를 들면 이런 용도에 잘 맞습니다.
+
+- 자산 현황을 스크립트에서 주기적으로 확인하기
+- 미체결 주문과 시세를 `json`으로 뽑아 다른 시스템에 넘기기
+- 조건 계산과 실제 실행 단계를 분리하기
+- 자동화 도구가 토스증권 작업을 명령 단위로 호출하기
+
+즉, 판단과 전체 흐름 관리는 바깥에서 하고, `tossinvest-cli`는 토스증권 쪽 실행을 맡는 구조를 염두에 두고 있습니다.
+
+## 현재 상태
+
+지금 바로 되는 것:
+
+- 브라우저 로그인 기반 세션 저장과 재사용
+- 계좌, 포트폴리오, 미체결 주문, 관심종목, 시세 조회
+- 제한된 거래 베타
+  - `미국주식`
+  - `매수`
+  - `지정가`
   - `KRW`
-  - `non-fractional`
-- live same-day pending order cancel
-- trading reverse-engineering docs and sanitized fixtures
+  - `비소수점`
+- 당일 미체결 주문 취소
+- 거래 분석 문서와 민감정보를 정리한 fixture 관리
 
-Still being hardened:
+아직 더 필요한 것:
 
-- `order amend` needs another fresh end-to-end verification after the latest `place/cancel` fixes
-- immediate-fill reconciliation is not as strong as pending-order reconciliation
-- broader trading coverage such as `sell`, `market`, `KR`, and `fractional` is not done yet
+- `order amend` 재검증
+- 즉시 체결 주문 확인 흐름 강화
+- `매도`, `시장가`, `국내주식`, `소수점 주문`
 
-## Architecture
+## 요구 사항
 
-- `Go`: main CLI, domain model, read-only client, trading client, output rendering, session lifecycle
-- `Python`: browser login helper and reverse-engineering utilities
-- `Rust`: optional later addition for isolated performance-sensitive workers if there is a real need
+| Requirement | Notes |
+|-------------|-------|
+| Go | `>= 1.25` |
+| Python | `>= 3.11` |
+| Playwright Chromium | `auth login`에 필요 |
 
-Tracked references:
+## 설치
 
-- [`docs/reverse-engineering/`](docs/reverse-engineering/)
-- [`docs/trading/`](docs/trading/)
-
-## Current Command Surface
+macOS에서는 Homebrew 설치를 기본 경로로 생각하고 있습니다.
 
 ```bash
+brew tap JungHoonGhae/tossinvest-cli
+brew install tossctl
+```
+
+설치 후에는 먼저 환경을 확인합니다.
+
+```bash
+tossctl version
+tossctl doctor
+tossctl auth doctor
+```
+
+소스에서 직접 빌드하려면:
+
+```bash
+git clone https://github.com/JungHoonGhae/tossinvest-cli.git
+cd tossinvest-cli
+make build
+
+cd auth-helper
+python3 -m pip install -e .
+python3 -m playwright install chromium
+```
+
+## 빠른 시작
+
+```bash
+tossctl version
+tossctl doctor
+tossctl auth doctor
 tossctl auth login
+tossctl auth status
+tossctl quote get TSLL --output json
+tossctl account summary --output json
+tossctl orders list --output json
+```
+
+## 명령 표면
+
+조회:
+
+```bash
+tossctl version
+tossctl doctor
+
+tossctl auth login
+tossctl auth doctor
 tossctl auth status
 tossctl auth logout
 
@@ -53,7 +129,11 @@ tossctl portfolio allocation
 tossctl orders list
 tossctl watchlist list
 tossctl quote get <symbol>
+```
 
+거래:
+
+```bash
 tossctl order preview
 tossctl order place
 tossctl order cancel
@@ -61,84 +141,24 @@ tossctl order amend
 tossctl order permissions status
 tossctl order permissions grant --ttl 300
 tossctl order permissions revoke
-
-tossctl export positions --format csv
-tossctl export orders --format json
 ```
 
-## Supported Flows
-
-Read-only flows that work now:
-
-- `auth login`
-- `auth status`
-- `auth logout`
-- `quote get`
-- `account list`
-- `account summary`
-- `portfolio positions`
-- `portfolio allocation`
-- `orders list`
-- `watchlist list`
-
-Trading flows that work now:
+현재 live 검증이 끝난 범위:
 
 - `order preview`
 - `order place` for `US buy limit / KRW / non-fractional`
 - `order cancel` for same-day pending orders
 
-Trading flows that exist but should still be treated as beta:
+아직 베타로 봐야 하는 범위:
 
 - `order amend`
 
-## Trading Safety Model
+## 주문 예시
 
-Trading is intentionally awkward to execute.
-
-Mutation commands require:
-
-- `order preview` to generate the canonical intent and confirm token
-- `order permissions grant --ttl 300`
-- `--execute`
-- `--dangerously-skip-permissions`
-- `--confirm <token>`
-
-This is deliberate. The CLI is not trying to optimize accidental order placement.
-
-## Local Paths
-
-By default, the CLI uses OS-native paths:
-
-- config dir: `$(os.UserConfigDir)/tossctl`
-- cache dir: `$(os.UserCacheDir)/tossctl`
-- session file: `<config dir>/session.json`
-- permission file: `<config dir>/trading-permission.json`
-
-During development you can override paths with:
-
-- `--config-dir`
-- `--session-file`
-
-## Development
+아래는 `TSLL` 1주를 `500원` 지정가로 미리보기한 뒤 실제 주문하는 흐름입니다.
 
 ```bash
-make tidy
-make fmt
-make build
-make test
-cd auth-helper && python3 -m pip install -e . && python3 -m playwright install chromium
-./bin/tossctl --help
-./bin/tossctl auth login
-./bin/tossctl auth status
-./bin/tossctl quote get TSLL --output json
-./bin/tossctl account summary --output json
-./bin/tossctl orders list --output json
-```
-
-## Example Trading Flow
-
-```bash
-./bin/tossctl order preview \
+tossctl order preview \
   --symbol TSLL \
   --market us \
   --side buy \
@@ -148,9 +168,9 @@ cd auth-helper && python3 -m pip install -e . && python3 -m playwright install c
   --currency-mode KRW \
   --output json
 
-./bin/tossctl order permissions grant --ttl 300
+tossctl order permissions grant --ttl 300
 
-./bin/tossctl order place \
+tossctl order place \
   --symbol TSLL \
   --market us \
   --side buy \
@@ -163,11 +183,69 @@ cd auth-helper && python3 -m pip install -e . && python3 -m playwright install c
   --confirm <preview-token> \
   --output json
 
-./bin/tossctl orders list --output json
+tossctl orders list --output json
 ```
 
-## Warning
+## 거래 안전장치
 
-This project is unofficial and not affiliated with Toss Securities.
+금융 자동화는 다른 앱 자동화와 다릅니다.
 
-Internal web APIs can change without notice, trading flows can require additional browser-side checks, and mistakes can affect a real account. Use it only if you understand those risks.
+- 비공식 API라서 언제든 깨질 수 있음
+- 잘못된 판단이 바로 실계좌로 이어질 수 있음
+- 환전, 추가 인증, 상품 위험고지 같은 분기가 자동화를 흔들 수 있음
+- 조회 자동화보다 주문 자동화의 사고 비용이 훨씬 큼
+
+그래서 이 프로젝트는 일부러 몇 단계 확인을 남겨두고 있습니다.
+
+- `order preview`
+- `order permissions grant`
+- `--execute`
+- `--dangerously-skip-permissions`
+- `--confirm`
+
+금융에서는 편의성보다 오작동 방지가 먼저입니다.
+
+## 개발
+
+```bash
+make tidy
+make fmt
+make build
+make test
+```
+
+`auth-helper`는 브라우저 로그인만 담당합니다. 토스증권 도메인 로직은 Go CLI 쪽에 남겨두고, 브라우저 자동화는 분리해 유지합니다.
+
+## 문서
+
+- [`docs/reverse-engineering/`](docs/reverse-engineering/)
+- [`docs/trading/`](docs/trading/)
+- [`auth-helper/README.md`](auth-helper/README.md)
+
+## 로컬 저장 경로
+
+- config dir: `$(os.UserConfigDir)/tossctl`
+- cache dir: `$(os.UserCacheDir)/tossctl`
+- session file: `<config dir>/session.json`
+- permission file: `<config dir>/trading-permission.json`
+
+개발 중에는 아래 플래그로 경로를 덮어쓸 수 있습니다.
+
+- `--config-dir`
+- `--session-file`
+
+## Support
+
+도움이 되었다면 유지보수에 힘을 보태 주세요.
+
+<a href="https://www.buymeacoffee.com/lucas.ghae">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50">
+</a>
+
+## Contributing
+
+버그 제보와 PR은 환영합니다.
+
+## License
+
+MIT
