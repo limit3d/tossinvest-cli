@@ -84,6 +84,14 @@ tossctl doctor
 tossctl auth doctor
 ```
 
+`auth login`까지 쓰려면 Homebrew Python에 Playwright와 Chromium을 준비해야 합니다.
+
+```bash
+PY="$(brew --prefix python@3.11)/bin/python3.11"
+"$PY" -m pip install playwright
+"$PY" -m playwright install chromium
+```
+
 소스에서 직접 빌드하려면:
 
 ```bash
