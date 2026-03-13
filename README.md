@@ -297,8 +297,9 @@ tossctl orders list --output json
 `amend`나 `cancel` 이후에는 브로커 쪽 주문 ref가 새 값으로 바뀔 수 있습니다.
 
 - mutation 결과에 `original_order_id`와 `current_order_id`가 함께 나오면 rollover가 발생한 것입니다.
-- 같은 로컬 `config dir`에서 실행한 mutation이라면 `tossctl order show <old-id>`가 local lineage cache를 통해 새 ref를 다시 찾을 수 있습니다.
+- 같은 로컬 `config dir`에서 실행한 mutation이고, mutation 시점에 `current_order_id`까지 확인된 경우에는 `tossctl order show <old-id>`가 local lineage cache를 통해 새 ref를 다시 찾을 수 있습니다.
 - lineage cache는 `<config dir>/trading-lineage.json`에 저장됩니다.
+- broker의 completed-history 반영이 늦으면 이번 정보가 바로 기록되지 않을 수 있고, 그 경우에는 먼저 `orders completed`에서 새 ref를 확인해야 할 수 있습니다.
 - 다른 머신이나 다른 `--config-dir`에서 실행한 주문까지 추적하는 기능은 아직 아닙니다.
 
 ## 개발
@@ -318,7 +319,7 @@ make test
 토스증권 조회를 스크립트에 넣고 싶거나, 주문 전 확인과 제한된 주문 흐름을 CLI로 다루고 싶은 사용자에게 맞습니다.
 
 **바로 주문까지 가능한가요?**  
-일부 범위만 베타로 지원합니다. 현재 live 검증이 끝난 건 `US buy limit / KRW / non-fractional` 기준의 `place`, 당일 pending `cancel`, 그리고 `orders completed` / `order show <id>` 기반 상태 조회입니다. `cancel`과 `amend` 후 ref rollover는 local lineage cache로 다시 찾을 수 있지만, `amend` 자체는 아직 더 많은 live 검증이 필요합니다. 거래 기능은 먼저 `config.json`에서 해당 액션을 직접 허용해야 합니다.
+일부 범위만 베타로 지원합니다. 현재 live 검증이 끝난 건 `US buy limit / KRW / non-fractional` 기준의 `place`, 당일 pending `cancel`, 그리고 `orders completed` / `order show <id>` 기반 상태 조회입니다. `cancel`과 `amend` 후 ref rollover는 일부 경우 local lineage cache로 다시 찾을 수 있지만, broker history 반영이 늦으면 먼저 새 ref를 확인해야 할 수 있습니다. `amend` 자체는 아직 더 많은 live 검증이 필요합니다. 거래 기능은 먼저 `config.json`에서 해당 액션을 직접 허용해야 합니다.
 
 **공식 API인가요?**  
 아닙니다. 토스증권 공식 제품이 아니고, 웹 내부 API를 재사용하는 비공식 프로젝트입니다.

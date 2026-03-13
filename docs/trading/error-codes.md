@@ -188,6 +188,7 @@ CLI implication:
 - both cancel modes still follow `prepare -> mutation -> reconcile`
 - mutation success alone is insufficient; the client should confirm the order disappeared from pending history
 - cancel may reappear in completed history under a new user-facing order reference, so lookup should not assume the original pending ref survives
+- the canceled completed-history row may appear after the immediate reconciliation window, so a mutation-time lineage cache can still miss the final ref
 - a later capture confirmed the cancel body includes:
   - `stockCode`
   - `tradeType`

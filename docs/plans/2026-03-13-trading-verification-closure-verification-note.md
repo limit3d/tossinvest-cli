@@ -100,6 +100,28 @@ Scope: US buy limit / KRW / non-fractional only
   - `order show 2026-03-13/2` resolved the canceled order successfully
   - later code change added a local lineage cache so `order show <original-id>` can follow this rollover when the mutation was executed through the same config dir
 
+### Post-lineage live retest
+
+- new pending place:
+  - `TSLL` 1주 `500 KRW`
+  - result: `accepted_pending`
+  - returned order reference: `2026-03-13/3`
+- amend retest:
+  - target: `2026-03-13/3`
+  - new price: `700 KRW`
+  - result: still blocked by `interactive trade authentication required`
+- cancel retest:
+  - target: `2026-03-13/3`
+  - immediate result: `canceled`
+  - immediate reconciliation: pending disappeared, but completed row was not yet visible so no `current_order_id` was returned
+  - delayed reconciliation:
+    - `orders completed --market us` later showed the canceled order as `2026-03-13/4`
+    - `order show 2026-03-13/3` still failed because the delayed completed-history rollover had not been captured into the local lineage cache at mutation time
+- conclusion:
+  - `amend` remains blocked by broker-side interactive auth for this account/session
+  - cancel rollover can appear later than the mutation reconciliation window
+  - current lineage fallback helps only when the surviving ref is visible during mutation-time reconciliation
+
 ## Code Changes Found Necessary During Live Verification
 
 - `GetOrderAvailableActions` now uses the resolved raw pending-order id instead of the user-facing reference id
@@ -121,10 +143,11 @@ Scope: US buy limit / KRW / non-fractional only
 ## Still Pending
 
 - live re-test of `order amend` after lineage/reconciliation changes
+- delayed cancel rollover capture when completed history appears after the immediate reconciliation window
 - evidence-driven confirmation of whether the observed interactive-auth branch for `amend` is account-specific or generally expected
 
 ## Next Operator Steps
 
 1. Run full `go test ./...` after the live-driven fixes.
-2. Live re-test `order amend` and record whether the outcome is still `interactive auth required` or a completed success path.
-3. If needed, document any new amend-specific rollover evidence in trading docs.
+2. Decide whether to extend lineage tracking so delayed completed-history rows can be linked back to the original canceled order.
+3. Live re-test `order amend` again only if broker-side interactive auth can be satisfied or explicitly automated.
