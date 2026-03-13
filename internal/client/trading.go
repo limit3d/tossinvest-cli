@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -17,6 +18,7 @@ import (
 )
 
 type pendingOrderDetails struct {
+	OrderID            string
 	OrderNo            string
 	OrderedDate        string
 	StockCode          string
@@ -150,10 +152,19 @@ func (c *Client) GetOrderAvailableActions(ctx context.Context, orderID string) (
 	query.Set("fractional", strconv.FormatBool(order.IsFractionalOrder))
 	query.Set("isReservationOrder", strconv.FormatBool(order.IsAfterMarketOrder))
 
-	endpoint := fmt.Sprintf("%s/api/v3/trading/order/%s/available-actions?%s", c.certBaseURL, orderID, query.Encode())
+	brokerOrderID := strings.TrimSpace(order.OrderID)
+	if brokerOrderID == "" {
+		brokerOrderID = orderID
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v3/trading/order/%s/available-actions?%s", c.certBaseURL, url.PathEscape(brokerOrderID), query.Encode())
 
 	result := map[string]any{}
 	if err := c.getJSON(ctx, endpoint, &result); err != nil {
+		var statusErr *StatusError
+		if errors.As(err, &statusErr) && (statusErr.StatusCode == 400 || statusErr.StatusCode == 404) {
+			return map[string]any{}, nil
+		}
 		return nil, err
 	}
 	return result, nil
@@ -386,6 +397,7 @@ func orderMatchesID(raw json.RawMessage, orderID string) bool {
 
 func decodePendingOrderDetails(raw json.RawMessage) (pendingOrderDetails, error) {
 	var payload struct {
+		OrderID            string  `json:"orderId"`
 		OrderNo            any     `json:"orderNo"`
 		OrderedDate        string  `json:"orderedDate"`
 		StockCode          string  `json:"stockCode"`
@@ -403,6 +415,7 @@ func decodePendingOrderDetails(raw json.RawMessage) (pendingOrderDetails, error)
 	}
 
 	return pendingOrderDetails{
+		OrderID:            payload.OrderID,
 		OrderNo:            normalizeOrderIdentifier(payload.OrderNo, ""),
 		OrderedDate:        payload.OrderedDate,
 		StockCode:          payload.StockCode,

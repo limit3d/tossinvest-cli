@@ -108,6 +108,79 @@ func TestCancelPendingOrder(t *testing.T) {
 	}
 }
 
+func TestGetOrderAvailableActionsUsesResolvedPendingOrderID(t *testing.T) {
+	t.Parallel()
+
+	var requestedPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/trading/orders/histories/all/pending" {
+			_, _ = w.Write([]byte(`{"result":[{"orderId":"broker/order+raw==","stockCode":"US20220809012","orderedDate":"2026-03-11","orderNo":14,"tradeType":"buy","orderPrice":700,"orderUsdPrice":0.4753,"quantity":1,"pendingQuantity":1,"orderPriceTypeCode":"00","isFractionalOrder":false,"isAfterMarketOrder":false,"status":"체결대기"}]}`))
+			return
+		}
+
+		requestedPath = r.URL.RequestURI()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"enabled":true}`))
+	}))
+	defer server.Close()
+
+	client := New(Config{
+		HTTPClient:  server.Client(),
+		APIBaseURL:  server.URL,
+		InfoBaseURL: server.URL,
+		CertBaseURL: server.URL,
+		Session: &session.Session{
+			Cookies: map[string]string{"SESSION": "test-session"},
+			Headers: map[string]string{"App-Version": "v260311.1636"},
+			Storage: map[string]string{"localStorage:qr-tabId": "browser-tab-test123"},
+		},
+	})
+
+	if _, err := client.GetOrderAvailableActions(context.Background(), "2026-03-11/14"); err != nil {
+		t.Fatalf("GetOrderAvailableActions returned error: %v", err)
+	}
+
+	want := "/api/v3/trading/order/broker%2Forder+raw==/available-actions?fractional=false&isReservationOrder=false&orderPriceType=00&stockCode=US20220809012&tradeType=buy"
+	if requestedPath != want {
+		t.Fatalf("unexpected available-actions path:\nwant: %s\ngot:  %s", want, requestedPath)
+	}
+}
+
+func TestGetOrderAvailableActionsTreats400AsSoftFailure(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/trading/orders/histories/all/pending" {
+			_, _ = w.Write([]byte(`{"result":[{"orderId":"broker/order+raw==","stockCode":"US20220809012","orderedDate":"2026-03-11","orderNo":14,"tradeType":"buy","orderPrice":700,"orderUsdPrice":0.4753,"quantity":1,"pendingQuantity":1,"orderPriceTypeCode":"00","isFractionalOrder":false,"isAfterMarketOrder":false,"status":"체결대기"}]}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"unsupported"}`))
+	}))
+	defer server.Close()
+
+	client := New(Config{
+		HTTPClient:  server.Client(),
+		APIBaseURL:  server.URL,
+		InfoBaseURL: server.URL,
+		CertBaseURL: server.URL,
+		Session: &session.Session{
+			Cookies: map[string]string{"SESSION": "test-session"},
+			Headers: map[string]string{"App-Version": "v260311.1636"},
+			Storage: map[string]string{"localStorage:qr-tabId": "browser-tab-test123"},
+		},
+	})
+
+	result, err := client.GetOrderAvailableActions(context.Background(), "2026-03-11/14")
+	if err != nil {
+		t.Fatalf("GetOrderAvailableActions returned error: %v", err)
+	}
+	if len(result) != 0 {
+		t.Fatalf("expected empty result on soft failure, got %#v", result)
+	}
+}
+
 func TestBuildAmendBodyMatchesCapturedShape(t *testing.T) {
 	order := pendingOrderDetails{
 		OrderNo:            "13",

@@ -47,7 +47,7 @@ func userFacingCommandError(err error) error {
 		return fmt.Errorf("cancel mutation returned, but the order is still pending; reconcile with `tossctl orders list` before retrying")
 	}
 	if errors.Is(err, trading.ErrInteractiveAuthRequired) {
-		return fmt.Errorf("broker requested interactive trade authentication; complete the cancel in the web app and keep the browser session open")
+		return fmt.Errorf("broker requested interactive trade authentication; complete the trade action in the web app and keep the browser session open")
 	}
 
 	return err

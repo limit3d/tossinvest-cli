@@ -1,7 +1,7 @@
 # tossinvest-cli Trading Verification Closure Verification Note
 
 Date: 2026-03-13
-Status: In progress
+Status: Live verification executed
 Scope: US buy limit / KRW / non-fractional only
 
 ## Completed Checks
@@ -55,27 +55,74 @@ Scope: US buy limit / KRW / non-fractional only
 
 ## Current Blockers for Live Mutation Verification
 
-- `config.json` does not exist yet, so:
-  - `place=false`
-  - `cancel=false`
-  - `amend=false`
-  - `allow_dangerous_execute=false`
-- temporary trading permission is expired
-- any live verification of `order place`, `order amend`, or `order cancel` would affect the real account and should not be run implicitly
+- none for basic execution readiness
+
+## Live Execution Results
+
+### Live place
+
+- command: `tossctl order place --symbol TSLL --market us --side buy --type limit --qty 1 --price 500 --currency-mode KRW --execute ...`
+- result: success
+- returned mutation status: `accepted_pending`
+- returned order reference: `2026-03-13/1`
+- follow-up:
+  - `orders list` showed the order as `체결대기`
+  - `order show 2026-03-13/1` also resolved the pending order
+
+### Live amend
+
+- command target: pending order `2026-03-13/1`, new price `700 KRW`
+- first observed issue:
+  - the implementation sent the user-facing order reference into `available-actions`
+  - broker returned `404`
+- second observed issue:
+  - even with the broker raw order id, the value was not path-escaped, which also caused `404`
+- code fix applied during verification:
+  - resolve the raw broker order id from the pending order payload
+  - path-escape that id for `available-actions`
+  - treat `400` and `404` from `available-actions` as soft preflight failure so the real mutation path can continue
+- post-fix live result:
+  - mutation reached the broker but stopped with `interactive trade authentication required`
+- conclusion:
+  - `amend` is not yet end-to-end verified for this account/session
+  - the path construction bug is fixed
+  - the remaining blocker is broker-side interactive auth
+
+### Live cancel
+
+- command target: pending order `2026-03-13/1`
+- result: success
+- returned mutation status: `canceled`
+- follow-up:
+  - `orders list` became empty
+  - completed history did not keep the original reference `2026-03-13/1`
+  - completed history recorded the canceled order as `2026-03-13/2`
+  - `order show 2026-03-13/2` resolved the canceled order successfully
+
+## Code Changes Found Necessary During Live Verification
+
+- `GetOrderAvailableActions` now uses the resolved raw pending-order id instead of the user-facing reference id
+- the broker raw id is path-escaped before calling `available-actions`
+- `400` and `404` responses from `available-actions` are treated as soft failures because cancel/amend do not consume that payload today
+- interactive-auth user-facing text now refers to the generic trade action instead of saying "cancel" unconditionally
+- regression tests added for:
+  - resolved broker order id path construction
+  - path escaping of raw order ids
+  - soft-failure handling for `400`
+
+## Post-Run Safety State
+
+- trading permission revoked
+- local `config.json` restored to all trading flags disabled
 
 ## Still Pending
 
-- live `order place` verification
-- post-place `orders completed` and `order show <id>` verification against the new order
-- live `order amend` verification
-- live `order cancel` verification
-- evidence-driven README updates after live verification
-- any code or message corrections found during live verification
+- decide whether to reflect cancel rollover behavior in user-facing docs
+- decide whether `order show <original id>` should follow cancel rollover to the new completed-history id
+- evidence-driven README updates after reviewing whether the observed interactive-auth branch for `amend` is account-specific or generally expected
 
 ## Next Operator Steps
 
-1. Decide whether to proceed with live account verification.
-2. If yes, initialize `config.json` and explicitly enable only the required actions.
-3. Refresh trading permission with `tossctl order permissions grant --ttl ...`.
-4. Run the live verification sequence from the implementation plan.
-5. Record the exact returned status and order ids for each mutation.
+1. Run full `go test ./...` after the live-driven fixes.
+2. Decide whether to document cancel rollover from `2026-03-13/1` to `2026-03-13/2` in README or trading docs.
+3. Decide whether to improve `order show` so the original pending-order reference can still find the canceled completed-history record.
