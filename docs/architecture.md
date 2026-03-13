@@ -202,7 +202,8 @@ sequenceDiagram
    - `place`
    - `cancel`
    - `amend`
-   - `allow_dangerous_execute`
+   - `allow_live_order_actions`
+   - `dangerous_automation.*`
 2. `order permissions grant --ttl ...`
 3. `--execute`
 4. `--dangerously-skip-permissions`

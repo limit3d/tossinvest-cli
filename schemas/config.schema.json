@@ -11,7 +11,7 @@
     },
     "schema_version": {
       "type": "integer",
-      "const": 1
+      "const": 2
     },
     "trading": {
       "type": "object",
@@ -33,9 +33,27 @@
           "type": "boolean",
           "default": false
         },
-        "allow_dangerous_execute": {
+        "allow_live_order_actions": {
           "type": "boolean",
           "default": false
+        },
+        "dangerous_automation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "complete_trade_auth": {
+              "type": "boolean",
+              "default": false
+            },
+            "accept_product_ack": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "complete_trade_auth",
+            "accept_product_ack"
+          ]
         }
       },
       "required": [
@@ -43,7 +61,8 @@
         "place",
         "cancel",
         "amend",
-        "allow_dangerous_execute"
+        "allow_live_order_actions",
+        "dangerous_automation"
       ]
     }
   },

@@ -63,7 +63,7 @@ func userFacingTradingError(paths config.Paths, err error) error {
 		return fmt.Errorf("trading action `%s` is disabled; run `tossctl config init` if needed and update %s", disabled.Action, paths.ConfigFile)
 	}
 	if errors.Is(err, trading.ErrDangerousExecuteDisabled) {
-		return fmt.Errorf("dangerous execute is disabled; set `trading.allow_dangerous_execute=true` in %s", paths.ConfigFile)
+		return fmt.Errorf("live order actions are disabled; set `trading.allow_live_order_actions=true` in %s", paths.ConfigFile)
 	}
 
 	return userFacingCommandError(err)

@@ -63,8 +63,8 @@ func (s *Service) PreviewPlace(intent orderintent.PlaceIntent) Preview {
 	if !s.policy.Place {
 		warnings = append(warnings, "Config currently disables `order place`.")
 	}
-	if !s.policy.AllowDangerousExecute {
-		warnings = append(warnings, "Config currently disables dangerous live execution.")
+	if !s.policy.AllowLiveOrderActions {
+		warnings = append(warnings, "Config currently disables live order actions.")
 	}
 	return Preview{
 		Kind:          "place",
@@ -72,7 +72,7 @@ func (s *Service) PreviewPlace(intent orderintent.PlaceIntent) Preview {
 		ConfirmToken:  orderintent.ConfirmToken(canonical),
 		Warnings:      warnings,
 		LiveReady:     liveReady,
-		MutationReady: liveReady && s.policy.Place && s.policy.AllowDangerousExecute,
+		MutationReady: liveReady && s.policy.Place && s.policy.AllowLiveOrderActions,
 	}
 }
 
@@ -82,8 +82,8 @@ func (s *Service) PreviewCancel(intent orderintent.CancelIntent) Preview {
 	if !s.policy.Cancel {
 		warnings = append(warnings, "Config currently disables `order cancel`.")
 	}
-	if !s.policy.AllowDangerousExecute {
-		warnings = append(warnings, "Config currently disables dangerous live execution.")
+	if !s.policy.AllowLiveOrderActions {
+		warnings = append(warnings, "Config currently disables live order actions.")
 	}
 	return Preview{
 		Kind:          "cancel",
@@ -91,7 +91,7 @@ func (s *Service) PreviewCancel(intent orderintent.CancelIntent) Preview {
 		ConfirmToken:  orderintent.ConfirmToken(canonical),
 		Warnings:      warnings,
 		LiveReady:     true,
-		MutationReady: s.policy.Cancel && s.policy.AllowDangerousExecute,
+		MutationReady: s.policy.Cancel && s.policy.AllowLiveOrderActions,
 	}
 }
 
@@ -104,8 +104,8 @@ func (s *Service) PreviewAmend(intent orderintent.AmendIntent) Preview {
 	if !s.policy.Amend {
 		warnings = append(warnings, "Config currently disables `order amend`.")
 	}
-	if !s.policy.AllowDangerousExecute {
-		warnings = append(warnings, "Config currently disables dangerous live execution.")
+	if !s.policy.AllowLiveOrderActions {
+		warnings = append(warnings, "Config currently disables live order actions.")
 	}
 	return Preview{
 		Kind:          "amend",
@@ -113,7 +113,7 @@ func (s *Service) PreviewAmend(intent orderintent.AmendIntent) Preview {
 		ConfirmToken:  orderintent.ConfirmToken(canonical),
 		Warnings:      warnings,
 		LiveReady:     true,
-		MutationReady: s.policy.Amend && s.policy.AllowDangerousExecute,
+		MutationReady: s.policy.Amend && s.policy.AllowLiveOrderActions,
 	}
 }
 
@@ -181,7 +181,7 @@ func (s *Service) guard(ctx context.Context, action Action, preview Preview, opt
 	if !opts.Execute {
 		return fmt.Errorf("%w; rerun with --execute after reviewing `tossctl order preview`", ErrExecuteRequired)
 	}
-	if !s.policy.AllowDangerousExecute {
+	if !s.policy.AllowLiveOrderActions {
 		return ErrDangerousExecuteDisabled
 	}
 	if !opts.DangerouslySkipPermissions {

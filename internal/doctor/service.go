@@ -94,6 +94,9 @@ func (s *Service) Run(ctx context.Context) (Report, error) {
 		checkFile("session_file", s.paths.SessionFile),
 		checkFile("permission_file", s.paths.PermissionFile),
 		checkTradingConfig(s.configState),
+		checkLiveOrderActions(s.configState),
+		checkDangerousAutomation(s.configState),
+		checkLegacyConfig(s.configState),
 		checkPermission(permissionStatus),
 		{
 			Name:    "trading_scope",
@@ -338,19 +341,7 @@ func checkTradingConfig(status config.Status) Check {
 		}
 	}
 
-	enabled := []string{}
-	if status.Trading.Grant {
-		enabled = append(enabled, "grant")
-	}
-	if status.Trading.Place {
-		enabled = append(enabled, "place")
-	}
-	if status.Trading.Cancel {
-		enabled = append(enabled, "cancel")
-	}
-	if status.Trading.Amend {
-		enabled = append(enabled, "amend")
-	}
+	enabled := status.Trading.EnabledActions()
 	if len(enabled) == 0 {
 		return Check{
 			Name:    "trading_config",
@@ -365,5 +356,66 @@ func checkTradingConfig(status config.Status) Check {
 		Status:  CheckOK,
 		Summary: "one or more trading actions are enabled in config",
 		Detail:  strings.Join(enabled, ", "),
+	}
+}
+
+func checkLiveOrderActions(status config.Status) Check {
+	if !status.Exists || !status.Trading.AllowLiveOrderActions {
+		return Check{
+			Name:    "live_order_actions",
+			Status:  CheckInfo,
+			Summary: "real account-changing order actions are blocked",
+			Detail:  "Set `trading.allow_live_order_actions=true` only if you intend to let `place`, `cancel`, or `amend` reach the broker.",
+		}
+	}
+
+	return Check{
+		Name:    "live_order_actions",
+		Status:  CheckWarn,
+		Summary: "real account-changing order actions are enabled",
+		Detail:  "Live `place`, `cancel`, and `amend` can execute after the remaining permission and confirmation gates pass.",
+	}
+}
+
+func checkDangerousAutomation(status config.Status) Check {
+	enabled := status.Trading.DangerousAutomation.EnabledActions()
+	if len(enabled) == 0 {
+		return Check{
+			Name:    "dangerous_automation",
+			Status:  CheckInfo,
+			Summary: "no risky broker branches will be auto-continued",
+		}
+	}
+
+	return Check{
+		Name:    "dangerous_automation",
+		Status:  CheckWarn,
+		Summary: "risky broker branch automation is enabled",
+		Detail:  strings.Join(enabled, ", ") + " (only has effect when matching branch handlers exist in the current build)",
+	}
+}
+
+func checkLegacyConfig(status config.Status) Check {
+	if !status.Exists {
+		return Check{
+			Name:    "legacy_config",
+			Status:  CheckInfo,
+			Summary: "no config file is present, so no legacy translation is needed",
+		}
+	}
+
+	if len(status.LegacyFields) == 0 {
+		return Check{
+			Name:    "legacy_config",
+			Status:  CheckInfo,
+			Summary: "config is already using the current trading policy keys",
+		}
+	}
+
+	return Check{
+		Name:    "legacy_config",
+		Status:  CheckWarn,
+		Summary: "legacy trading config keys were translated into the current policy model",
+		Detail:  strings.Join(status.LegacyFields, ", ") + " -> trading.allow_live_order_actions",
 	}
 }

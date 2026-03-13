@@ -74,7 +74,7 @@ func TestPlaceRequiresExecutionFlagsAndGrant(t *testing.T) {
 
 	service := NewService(permissionService, config.Trading{
 		Place:                 true,
-		AllowDangerousExecute: true,
+		AllowLiveOrderActions: true,
 	}, nil)
 	intent, err := orderintent.NormalizePlace(orderintent.PlaceInput{
 		Symbol:       "TSLL",
@@ -121,7 +121,7 @@ func TestPlaceCallsBrokerForSupportedIntent(t *testing.T) {
 	broker := &brokerStub{}
 	service := NewService(permissionService, config.Trading{
 		Place:                 true,
-		AllowDangerousExecute: true,
+		AllowLiveOrderActions: true,
 	}, broker)
 	intent, err := orderintent.NormalizePlace(orderintent.PlaceInput{
 		Symbol:       "TSLL",
@@ -162,7 +162,7 @@ func TestCancelExecutesBrokerAndReconciles(t *testing.T) {
 	broker := &brokerStub{}
 	service := NewService(permissionService, config.Trading{
 		Cancel:                true,
-		AllowDangerousExecute: true,
+		AllowLiveOrderActions: true,
 	}, broker)
 
 	intent, err := orderintent.NormalizeCancel("5", "TSLL")
@@ -208,7 +208,7 @@ func TestCancelWaitsForPendingOrderToDisappear(t *testing.T) {
 	broker := &brokerStub{pendingSequence: []bool{true, true, false}}
 	service := NewService(permissionService, config.Trading{
 		Cancel:                true,
-		AllowDangerousExecute: true,
+		AllowLiveOrderActions: true,
 	}, broker)
 	intent, err := orderintent.NormalizeCancel("5", "TSLL")
 	if err != nil {
@@ -238,7 +238,7 @@ func TestCancelFailsWhenOrderStillPending(t *testing.T) {
 	broker := &brokerStub{stillPending: true}
 	service := NewService(permissionService, config.Trading{
 		Cancel:                true,
-		AllowDangerousExecute: true,
+		AllowLiveOrderActions: true,
 	}, broker)
 	previousAttempts := cancelReconcileAttempts
 	previousInterval := cancelReconcileInterval
@@ -276,7 +276,7 @@ func TestAmendCallsBrokerAfterGate(t *testing.T) {
 	broker := &brokerStub{}
 	service := NewService(permissionService, config.Trading{
 		Amend:                 true,
-		AllowDangerousExecute: true,
+		AllowLiveOrderActions: true,
 	}, broker)
 	price := 700.0
 	intent, err := orderintent.NormalizeAmend("13", nil, &price)
@@ -308,7 +308,7 @@ func TestPlaceFailsWhenActionDisabledInConfig(t *testing.T) {
 	}
 
 	service := NewService(permissionService, config.Trading{
-		AllowDangerousExecute: true,
+		AllowLiveOrderActions: true,
 	}, nil)
 	intent, err := orderintent.NormalizePlace(orderintent.PlaceInput{
 		Symbol:       "TSLL",

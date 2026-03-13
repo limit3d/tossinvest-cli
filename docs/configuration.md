@@ -23,13 +23,17 @@ tossctl config init
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/JungHoonGhae/tossinvest-cli/main/schemas/config.schema.json",
-  "schema_version": 1,
+  "schema_version": 2,
   "trading": {
     "grant": false,
     "place": false,
     "cancel": false,
     "amend": false,
-    "allow_dangerous_execute": false
+    "allow_live_order_actions": false,
+    "dangerous_automation": {
+      "complete_trade_auth": false,
+      "accept_product_ack": false
+    }
   }
 }
 ```
@@ -44,8 +48,14 @@ tossctl config init
   - `tossctl order cancel` 허용 여부
 - `trading.amend`
   - `tossctl order amend` 허용 여부
-- `trading.allow_dangerous_execute`
-  - `--dangerously-skip-permissions` 자체를 사용할 수 있는지
+- `trading.allow_live_order_actions`
+  - 실계좌 주문 액션(`place`, `cancel`, `amend`) 자체를 허용할지
+- `trading.dangerous_automation.complete_trade_auth`
+  - trade auth 분기를 자동 완료하도록 허용할지
+  - 해당 분기 handler가 구현된 빌드에서만 실제로 효과가 있습니다
+- `trading.dangerous_automation.accept_product_ack`
+  - product acknowledgement 분기를 자동 수락하도록 허용할지
+  - 해당 분기 handler가 구현된 빌드에서만 실제로 효과가 있습니다
 
 즉, 각 액션은 config에서 먼저 열려 있어야 하고, 그 다음에도 기존 실행 게이트를 통과해야 합니다.
 
@@ -54,10 +64,17 @@ tossctl config init
 거래 mutation이 실제로 실행되려면 아래 순서를 모두 만족해야 합니다.
 
 1. `config.json`에서 해당 액션 허용
+   - live mutation은 `trading.allow_live_order_actions=true`도 필요
 2. `tossctl order permissions grant`
 3. `--execute`
 4. `--dangerously-skip-permissions`
 5. `--confirm`
+
+## Legacy Compatibility
+
+기존 `schema_version: 1` 파일과 `trading.allow_dangerous_execute`는 계속 읽을 수 있습니다.
+
+다만 `config show`와 `doctor`는 새 이름 기준으로 해석해서 보여주고, legacy key를 변환해서 읽고 있으면 그 사실을 따로 알려줍니다.
 
 `order preview`는 거래 기능이 꺼져 있어도 계속 사용할 수 있습니다.
 

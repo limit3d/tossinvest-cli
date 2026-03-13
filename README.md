@@ -115,18 +115,22 @@ tossctl config show
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/JungHoonGhae/tossinvest-cli/main/schemas/config.schema.json",
-  "schema_version": 1,
+  "schema_version": 2,
   "trading": {
     "grant": false,
     "place": false,
     "cancel": false,
     "amend": false,
-    "allow_dangerous_execute": false
+    "allow_live_order_actions": false,
+    "dangerous_automation": {
+      "complete_trade_auth": false,
+      "accept_product_ack": false
+    }
   }
 }
 ```
 
-`grant`, `place`, `cancel`, `amend`는 기능별 허용 여부이고, `allow_dangerous_execute`는 `--dangerously-skip-permissions` 자체를 쓸 수 있는지 정합니다.
+`grant`, `place`, `cancel`, `amend`는 기능별 허용 여부입니다. `allow_live_order_actions`는 실제 계좌에 영향을 주는 주문 액션 자체를 허용할지 정하고, `dangerous_automation`은 어떤 위험한 브로커 분기를 자동 진행할 수 있게 둘지 정합니다.
 
 ## 지원 범위
 
@@ -243,7 +247,7 @@ tossctl order permissions revoke
 
 ```bash
 tossctl config init
-# edit config.json and set trading.grant/place/allow_dangerous_execute to true
+# edit config.json and set trading.grant/place/allow_live_order_actions to true
 
 tossctl order preview \
   --symbol TSLL \
@@ -278,6 +282,7 @@ tossctl orders list --output json
 거래 기능은 기본적으로 여러 단계 확인을 거치게 되어 있습니다.
 
 - `config.json`에서 기능별 허용
+- `config.json`에서 `allow_live_order_actions` 허용
 - `order preview`
 - `order permissions grant`
 - `--execute`
