@@ -606,6 +606,63 @@ func TestPlacePendingOrderReturnsFundingRequiredFromPrepare(t *testing.T) {
 	}
 }
 
+func TestPlacePendingOrderReturnsFundingRequiredFromFXFundingMessage(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v2/search/stocks":
+			_, _ = w.Write([]byte(`{"result":{"stocks":[{"stockCode":"US20220809012","stockName":"TSLL","matchType":"EXACT"}]}}`))
+		case "/api/v2/stock-infos/US20220809012":
+			_, _ = w.Write([]byte(`{"result":{"symbol":"TSLL","name":"TSLL","currency":"USD","status":"N","market":{"code":"NSQ","displayName":"NASDAQ"}}}`))
+		case "/api/v1/product/stock-prices":
+			_, _ = w.Write([]byte(`{"result":[{"productCode":"US20220809012","currency":"USD","base":14.38,"close":14.4,"closeKrw":21208,"volume":13409779}]}`))
+		case "/api/v1/exchange/usd/base-exchange-rate":
+			_, _ = w.Write([]byte(`{"result":{"rate":1472.8}}`))
+		case "/api/v2/wts/trading/order/prepare":
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_, _ = w.Write([]byte(`{"message":"환전에 필요한 원화 출금가능금액이 부족합니다."}`))
+		default:
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := New(Config{
+		HTTPClient:  server.Client(),
+		APIBaseURL:  server.URL,
+		InfoBaseURL: server.URL,
+		CertBaseURL: server.URL,
+		Session: &session.Session{
+			Cookies: map[string]string{"SESSION": "test-session"},
+			Headers: map[string]string{"App-Version": "v260311.2121"},
+			Storage: map[string]string{"localStorage:qr-tabId": "browser-tab-test123"},
+		},
+	})
+
+	intent, err := orderintent.NormalizePlace(orderintent.PlaceInput{
+		Symbol:       "TSLL",
+		Market:       "us",
+		Side:         "buy",
+		OrderType:    "limit",
+		Quantity:     1,
+		Price:        500,
+		CurrencyMode: "KRW",
+	})
+	if err != nil {
+		t.Fatalf("NormalizePlace returned error: %v", err)
+	}
+
+	_, err = client.PlacePendingOrder(context.Background(), intent)
+	var branchErr *tradingflow.BranchRequiredError
+	if !errors.As(err, &branchErr) {
+		t.Fatalf("expected BranchRequiredError, got %v", err)
+	}
+	if branchErr.Branch != tradingflow.BranchFundingRequired {
+		t.Fatalf("expected funding branch, got %q", branchErr.Branch)
+	}
+}
+
 func TestPlacePendingOrderReturnsFXConsentRequiredFromPrepare(t *testing.T) {
 	t.Parallel()
 

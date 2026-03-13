@@ -90,6 +90,10 @@ Expected normalized classes:
 - `insufficient_buying_power`
 - `funding_required`
 
+Later live wording observed on the same class:
+
+- broker message: `환전에 필요한 원화 출금가능금액이 부족합니다.`
+
 CLI implication:
 
 - `order preview` can remain local or calculator-backed

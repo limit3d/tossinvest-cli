@@ -142,6 +142,32 @@ Scope: US buy limit / KRW / non-fractional only
 - trading permission revoked
 - local `config.json` restored to all trading flags disabled
 
+## Funding Guidance Live Retest
+
+- focused live validation target:
+  - verify that `order place` now shows funding-specific operator guidance instead of a generic prepare failure
+- live inputs:
+  - `TSLL` 1주 `500 KRW`
+  - `TSLL` 1주 `1000 KRW`
+- observed broker rejection:
+  - both commands stopped at `prepare`
+  - broker message: `환전에 필요한 원화 출금가능금액이 부족합니다.`
+- initial result:
+  - the first implementation treated this message as a generic prepare rejection because the wording did not match the earlier `계좌 잔액이 부족해요` fixture
+- follow-up fix:
+  - classifier now treats `원화 출금가능금액 부족` wording as `funding_required`
+- live rerun after the fix:
+  - CLI showed funding-specific step-by-step guidance
+  - message included:
+    - cause summary: `주문 준비 단계에서 잔액 또는 주문가능금액이 부족해 진행이 중단되었습니다.`
+    - broker message echo
+    - retry preview command
+    - retry place command template with `--confirm <new-confirm-token>`
+- safety outcome:
+  - no pending order was created
+  - trading permission revoked again after verification
+  - local `config.json` restored to disabled state again
+
 ## Still Pending
 
 - live re-test of `order amend` after lineage/reconciliation changes
