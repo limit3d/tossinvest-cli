@@ -99,4 +99,7 @@ func TestInitCreatesDangerousAutomationDefaults(t *testing.T) {
 	if result.Status.Trading.DangerousAutomation.AcceptProductAck {
 		t.Fatal("expected accept_product_ack to be disabled by default")
 	}
+	if result.Status.Trading.DangerousAutomation.AcceptFXConsent {
+		t.Fatal("expected accept_fx_consent to be disabled by default")
+	}
 }

@@ -199,14 +199,145 @@ Scope: US buy limit / KRW / non-fractional only
   - trading permission revoked again after verification
   - local `config.json` restored to disabled state again
 
+## Thousand-KRW Live Retest
+
+- operator requested a rerun with `TSLL` 1주 `1000 KRW` because the mobile app was showing a foreign-exchange prompt on the same general path
+- live preflight state:
+  - account summary showed `orderable_amount_krw=1090`
+  - US market summary showed `orderable_amount_krw=503`, `orderable_amount_usd=0.34`
+  - pending orders were `[]`
+- live inputs:
+  - `TSLL` 1주 `1000 KRW`
+- observed result:
+  - `order preview` returned `mutation_ready=true`
+  - `order place` succeeded as `accepted_pending`
+  - pending order reference: `2026-03-13/7`
+- interpretation:
+  - this CLI / broker path still did not surface `fx_consent_required`
+  - despite the requested notional being above the reported US-market KRW buying-power snapshot, the broker accepted the pending order without an FX-consent stop during placement
+  - the currently observed behavior is therefore closer to `pending orders may be accepted first, with FX handling deferred outside this specific placement branch`
+- safety follow-up:
+  - the pending order was canceled immediately
+  - cancel resolved directly to a new completed-order reference: `2026-03-13/8`
+  - `order show 2026-03-13/7 --market us` resolved successfully to `2026-03-13/8`
+- safety outcome:
+  - pending orders returned to `[]`
+  - trading permission revoked again after verification
+  - local `config.json` restored to disabled state again
+
+## Desktop Web FX Prompt Investigation
+
+- investigation goal:
+  - determine whether the missing CLI `fx_consent_required` branch is a direct broker rejection or a later web-only confirmation step
+- method:
+  - reused the stored Toss web session inside a headed Playwright browser
+  - opened `https://www.tossinvest.com/stocks/US20220809012/order`
+  - replayed the same `TSLL` 1주 `1000 KRW` order inputs already tested via CLI
+- observed web sequence:
+  1. first `구매하기` click
+     - `POST /api/v2/wts/trading/order/prepare` returned `200`
+     - prepare response included `preparedOrderInfo.needExchange: 0.68`
+     - UI showed only the standard confirmation dialog `TSLL 구매 1주`
+  2. confirmation-dialog `구매` click
+     - browser fetched:
+       - `GET /api/v1/trading/settings/toggle/find?categoryName=GETTING_BACK_KRW`
+       - `GET /api/v1/exchange/current-quote/for-buy`
+     - UI then showed the FX prompt:
+       - `0.68달러가 부족해요`
+       - `주식 구매를 위해 환전할게요`
+       - `주문이 취소되면 계좌에는 달러로 남아있어요.`
+- important negative evidence:
+  - no `order/create` request was observed before the FX modal
+  - the FX prompt therefore appears after successful `prepare`, not as a direct `prepare` rejection
+- follow-up capture on FX-modal `확인`:
+  - `POST /api/v2/wts/trading/order/create`
+  - `POST /api/v1/trading/settings/toggle` with `{"categoryName":"EXCHANGE_INFO_CHECK","turnedOn":true}`
+  - no separate FX-confirm mutation was observed
+- implication:
+  - the current CLI gap is not only missing prepare-failure classification
+  - the web product has a second-stage FX confirmation branch after `prepare` succeeds
+  - CLI parity requires either:
+    - surfacing a post-prepare `fx_consent_required` stop, or
+    - explicitly auto-consuming the branch before `create`
+- safety outcome:
+  - the FX modal was canceled in the browser
+  - no order was created
+  - no pending order remained
+  - local screenshot saved to `output/playwright/fx-consent-web-prompt-tsll-1000krw.png`
+
+## Post-Prepare FX Branch CLI Verification
+
+- implementation change:
+  - CLI now reads `preparedOrderInfo.needExchange`
+  - when `needExchange > 0`, CLI fetches:
+    - `GET /api/v1/trading/settings/toggle/find?categoryName=GETTING_BACK_KRW`
+    - `GET /api/v1/exchange/current-quote/for-buy`
+  - CLI stops before `order/create` and returns a post-prepare `fx_consent_required` branch
+- live verification on 2026-03-13:
+  - input: `TSLL` 1주 `1000 KRW`
+  - account state before run:
+    - `orderable_amount_krw=1591`
+    - `orderable_amount_usd=0`
+    - US market buying power remained `0`
+  - `order preview` still returned `mutation_ready=true`
+  - `order place` no longer reached `accepted_pending`
+  - CLI output showed:
+    - `주문 준비는 통과했지만, 웹과 동일한 환전 확인 단계에서 중단되었습니다.`
+    - `0.68달러가 부족해요.`
+    - `예상 환전 금액: 1,022원`
+    - `예상 환율: 1,503.63원/USD`
+    - `주의: 주문이 취소되면 계좌에는 달러로 남아있어요.`
+- important outcome:
+  - the CLI now stops on the same branch family that the desktop web flow exposed
+  - no pending order was created
+  - `orders list` remained `[]`
+  - trading permission was revoked again after verification
+  - local `config.json` was restored to the disabled state again
+
+## FX Consent Automation Capture
+
+- browser capture on 2026-03-13:
+  - FX-modal `확인` did not call a dedicated consent endpoint
+  - instead the browser issued:
+    - `POST /api/v2/wts/trading/order/create`
+    - `POST /api/v1/trading/settings/toggle` with `EXCHANGE_INFO_CHECK=true`
+- implementation outcome:
+  - `dangerous_automation.accept_fx_consent=true` now means:
+    - keep the post-prepare read calls
+    - continue through `order/create`
+    - then best-effort mark `EXCHANGE_INFO_CHECK=true`
+
+## FX Consent Automation Live Verification
+
+- config used only for this retest:
+  - `schema_version: 2`
+  - `trading.grant=true`
+  - `trading.place=true`
+  - `trading.cancel=true`
+  - `trading.allow_live_order_actions=true`
+  - `trading.dangerous_automation.accept_fx_consent=true`
+- live place on 2026-03-13:
+  - input: `TSLL` 1주 `1000 KRW`
+  - `order preview` returned confirm token `9c80a781bae7`
+  - `order place` reached `accepted_pending` instead of stopping on FX consent
+  - created pending ref: `2026-03-13/9`
+- live cleanup:
+  - `order cancel` succeeded
+  - cancel preview token: `46f51d16e687`
+  - surviving completed ref: `2026-03-13/10`
+  - `order show 2026-03-13/9 --market us` resolved to `2026-03-13/10`
+  - `orders list` returned `[]`
+- safety cleanup:
+  - trading permission was revoked again
+  - external `config.json` was restored to the original disabled `schema_version: 1` state
+
 ## Still Pending
 
 - live re-test of `order amend` after lineage/reconciliation changes
-- live capture of an explicit `fx_consent_required` broker message after funding is no longer the blocking branch
 - evidence-driven confirmation of whether the observed interactive-auth branch for `amend` is account-specific or generally expected
 
 ## Next Operator Steps
 
-1. Run full `go test ./...` after the live-driven fixes.
-2. Live re-test `order show <old-id>` on a delayed cancel rollover after the new on-demand recovery path lands.
-3. Live re-test `order amend` again only if broker-side interactive auth can be satisfied or explicitly automated.
+1. Keep `order show <old-id>` and delayed cancel rollover verification in the regular regression loop.
+2. Live re-test `order amend` again only if broker-side interactive auth can be satisfied or explicitly automated.
+3. Decide whether `complete_trade_auth` deserves the same evidence-first automation treatment next.

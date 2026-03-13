@@ -25,10 +25,30 @@ const (
 	BranchFXConsentRequired Branch = "fx_consent_required"
 )
 
+type BranchSource string
+
+const (
+	BranchSourcePrepareRejection        BranchSource = "prepare_rejection"
+	BranchSourcePostPrepareConfirmation BranchSource = "post_prepare_confirmation"
+)
+
+type FXConfirmationContext struct {
+	NeedExchangeUSD      float64 `json:"need_exchange_usd,omitempty"`
+	EstimatedExchangeKRW float64 `json:"estimated_exchange_krw,omitempty"`
+	USDExchangeRate      float64 `json:"usd_exchange_rate,omitempty"`
+	RateQuoteID          string  `json:"rate_quote_id,omitempty"`
+	ValidFrom            string  `json:"valid_from,omitempty"`
+	ValidTill            string  `json:"valid_till,omitempty"`
+	GettingBackKRW       bool    `json:"getting_back_krw,omitempty"`
+	GettingBackKRWKnown  bool    `json:"getting_back_krw_known,omitempty"`
+}
+
 type BranchRequiredError struct {
 	Branch        Branch
+	Source        BranchSource
 	StatusCode    int
 	BrokerMessage string
+	FX            *FXConfirmationContext
 }
 
 func (e *BranchRequiredError) Error() string {

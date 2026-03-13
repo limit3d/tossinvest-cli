@@ -16,6 +16,7 @@ const (
 type DangerousAutomation struct {
 	CompleteTradeAuth bool `json:"complete_trade_auth"`
 	AcceptProductAck  bool `json:"accept_product_ack"`
+	AcceptFXConsent   bool `json:"accept_fx_consent"`
 }
 
 type Trading struct {
@@ -51,6 +52,9 @@ func (d DangerousAutomation) EnabledActions() []string {
 	}
 	if d.AcceptProductAck {
 		enabled = append(enabled, "accept_product_ack")
+	}
+	if d.AcceptFXConsent {
+		enabled = append(enabled, "accept_fx_consent")
 	}
 	return enabled
 }

@@ -164,6 +164,34 @@ CLI implication:
   - `marginTrading: false`
   - `extra.*` present only on the final `create` step
 
+### FX Prompt After Successful Prepare
+
+Observed on the desktop web TSLL `1000 KRW` path:
+
+- first `구매하기` click:
+  - `POST /api/v2/wts/trading/order/prepare` -> `200`
+  - response included `preparedOrderInfo.needExchange: 0.68`
+  - UI only showed the standard order confirmation dialog
+- confirmation-dialog `구매` click:
+  - web fetched:
+    - `GET /api/v1/trading/settings/toggle/find?categoryName=GETTING_BACK_KRW`
+    - `GET /api/v1/exchange/current-quote/for-buy`
+  - UI then showed:
+    - `0.68달러가 부족해요`
+    - `주식 구매를 위해 환전할게요`
+    - `주문이 취소되면 계좌에는 달러로 남아있어요.`
+- no `order/create` request was observed before the FX modal
+- FX-modal `확인` click:
+  - `POST /api/v2/wts/trading/order/create`
+  - `POST /api/v1/trading/settings/toggle` with `{"categoryName":"EXCHANGE_INFO_CHECK","turnedOn":true}`
+
+CLI implication:
+
+- `fx_consent_required` is not only a prepare-failure classification problem
+- the desktop web product has a post-prepare FX branch that the CLI now models separately from prepare failures
+- the current CLI stops after successful `prepare` when `needExchange > 0` and surfaces operator guidance before `create`
+- `dangerous_automation.accept_fx_consent=true` can now consume this branch and continue into `order/create`
+
 ### Bulk Cancel Success
 
 Observed on TSLL pending order:
@@ -251,7 +279,7 @@ CLI rule:
 - rejection body for `order/prepare` if accessible via browser-side fetch interception
 - successful `order/prepare` response
 - successful `order/create` response
-- funding and FX approval branch requests
+- funding branch requests beyond the current captured wording
 - any structured broker error codes
 - submit-time validation vs preflight validation differences
 - amend rejection cases

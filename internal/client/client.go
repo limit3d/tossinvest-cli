@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/junghoonkye/tossinvest-cli/internal/config"
 	"github.com/junghoonkye/tossinvest-cli/internal/session"
 )
 
@@ -19,21 +20,23 @@ const defaultInfoBaseURL = "https://wts-info-api.tossinvest.com"
 const defaultCertBaseURL = "https://wts-cert-api.tossinvest.com"
 
 type Config struct {
-	HTTPClient  *http.Client
-	APIBaseURL  string
-	InfoBaseURL string
-	CertBaseURL string
-	Session     *session.Session
+	HTTPClient    *http.Client
+	APIBaseURL    string
+	InfoBaseURL   string
+	CertBaseURL   string
+	Session       *session.Session
+	TradingPolicy config.Trading
 }
 
 type Client struct {
-	httpClient  *http.Client
-	apiBaseURL  string
-	infoBaseURL string
-	certBaseURL string
-	session     *session.Session
-	browserTabID string
-	appVersion   string
+	httpClient    *http.Client
+	apiBaseURL    string
+	infoBaseURL   string
+	certBaseURL   string
+	session       *session.Session
+	tradingPolicy config.Trading
+	browserTabID  string
+	appVersion    string
 }
 
 func New(cfg Config) *Client {
@@ -56,13 +59,14 @@ func New(cfg Config) *Client {
 	}
 
 	return &Client{
-		httpClient:  httpClient,
-		apiBaseURL:  apiBaseURL,
-		infoBaseURL: infoBaseURL,
-		certBaseURL: certBaseURL,
-		session:     cfg.Session,
-		browserTabID: inferBrowserTabID(cfg.Session),
-		appVersion:   inferAppVersion(cfg.Session),
+		httpClient:    httpClient,
+		apiBaseURL:    apiBaseURL,
+		infoBaseURL:   infoBaseURL,
+		certBaseURL:   certBaseURL,
+		session:       cfg.Session,
+		tradingPolicy: cfg.TradingPolicy,
+		browserTabID:  inferBrowserTabID(cfg.Session),
+		appVersion:    inferAppVersion(cfg.Session),
 	}
 }
 

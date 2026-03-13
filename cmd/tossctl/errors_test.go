@@ -69,6 +69,54 @@ func TestUserFacingPlaceErrorFormatsFXGuidance(t *testing.T) {
 	}
 }
 
+func TestUserFacingPlaceErrorFormatsPostPrepareFXGuidance(t *testing.T) {
+	t.Parallel()
+
+	err := userFacingPlaceError(rootPathsForTest(), &trading.BranchRequiredError{
+		Branch:     trading.BranchFXConsentRequired,
+		Source:     trading.BranchSourcePostPrepareConfirmation,
+		StatusCode: 200,
+		FX: &trading.FXConfirmationContext{
+			NeedExchangeUSD:      0.68,
+			EstimatedExchangeKRW: 1020,
+			USDExchangeRate:      1500.21,
+			GettingBackKRWKnown:  true,
+			GettingBackKRW:       false,
+		},
+	}, &placeFlags{
+		symbol:       "TSLL",
+		market:       "us",
+		side:         "buy",
+		orderType:    "limit",
+		quantity:     1,
+		price:        1000,
+		currencyMode: "KRW",
+	})
+	if err == nil {
+		t.Fatal("expected formatted error")
+	}
+
+	message := err.Error()
+	if !strings.Contains(message, "주문 준비는 통과했지만") {
+		t.Fatalf("expected post-prepare intro, got %q", message)
+	}
+	if !strings.Contains(message, "0.68달러가 부족해요.") {
+		t.Fatalf("expected need-exchange line, got %q", message)
+	}
+	if !strings.Contains(message, "예상 환전 금액: 1,020원") {
+		t.Fatalf("expected estimated exchange amount, got %q", message)
+	}
+	if !strings.Contains(message, "예상 환율: 1,500.21원/USD") {
+		t.Fatalf("expected exchange rate detail, got %q", message)
+	}
+	if !strings.Contains(message, "계좌에는 달러로 남아있어요") {
+		t.Fatalf("expected retained-USD warning, got %q", message)
+	}
+	if !strings.Contains(message, "accept_fx_consent=true") {
+		t.Fatalf("expected config guidance for automation, got %q", message)
+	}
+}
+
 func rootPathsForTest() config.Paths {
 	return config.Paths{}
 }

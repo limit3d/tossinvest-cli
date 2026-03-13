@@ -124,7 +124,8 @@ tossctl config show
     "allow_live_order_actions": false,
     "dangerous_automation": {
       "complete_trade_auth": false,
-      "accept_product_ack": false
+      "accept_product_ack": false,
+      "accept_fx_consent": false
     }
   }
 }

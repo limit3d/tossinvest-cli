@@ -42,14 +42,26 @@ type mutationEnvelope[T any] struct {
 	Result T `json:"result"`
 }
 
+type authRequiredResult struct {
+	Required    bool `json:"required"`
+	SimpleTrade bool `json:"simpleTrade"`
+	Verifier    any  `json:"verifier"`
+}
+
+type placePreparedOrderInfo struct {
+	NeedExchange float64 `json:"needExchange"`
+}
+
+type placePrepareResult struct {
+	OrderKey          string                 `json:"orderKey"`
+	AuthRequired      authRequiredResult     `json:"authRequired"`
+	PreparedOrderInfo placePreparedOrderInfo `json:"preparedOrderInfo"`
+}
+
 type cancelPrepareResult struct {
-	DelayCancelExchange bool   `json:"delayCancelExchange"`
-	OrderKey            string `json:"orderKey"`
-	AuthRequired        struct {
-		Required    bool `json:"required"`
-		SimpleTrade bool `json:"simpleTrade"`
-		Verifier    any  `json:"verifier"`
-	} `json:"authRequired"`
+	DelayCancelExchange bool               `json:"delayCancelExchange"`
+	OrderKey            string             `json:"orderKey"`
+	AuthRequired        authRequiredResult `json:"authRequired"`
 }
 
 type cancelResult struct {
@@ -61,6 +73,26 @@ type cancelResult struct {
 	Modulus   string `json:"modulus"`
 	Exponent  string `json:"exponent"`
 	Keyboard  string `json:"keyboard"`
+}
+
+type tradingSettingToggleEnvelope struct {
+	Result struct {
+		CategoryName string `json:"categoryName"`
+		TurnedOn     bool   `json:"turnedOn"`
+	} `json:"result"`
+}
+
+type exchangeQuoteForBuyEnvelope struct {
+	Result struct {
+		RateQuoteID      string  `json:"rateQuoteId"`
+		BuyCurrency      string  `json:"buyCurrency"`
+		SellCurrency     string  `json:"sellCurrency"`
+		ValidFrom        string  `json:"validFrom"`
+		ValidTill        string  `json:"validTill"`
+		USDRate          float64 `json:"usdRate"`
+		DisplayUSDRate   float64 `json:"displayUsdRate"`
+		FavorablePercent float64 `json:"favorablePercent"`
+	} `json:"result"`
 }
 
 var (
@@ -105,8 +137,9 @@ func (c *Client) PlacePendingOrder(ctx context.Context, intent orderintent.Place
 	if err != nil {
 		return tradingflow.MutationResult{}, err
 	}
+	autoAcceptFXConsent := false
 
-	var prepare mutationEnvelope[cancelPrepareResult]
+	var prepare mutationEnvelope[placePrepareResult]
 	if err := c.postTradingJSON(ctx, fmt.Sprintf("%s/api/v2/wts/trading/order/prepare", c.certBaseURL), bodyPrepare, &prepare); err != nil {
 		return tradingflow.MutationResult{}, classifyPlacePrepareFailure(err)
 	}
@@ -116,12 +149,22 @@ func (c *Client) PlacePendingOrder(ctx context.Context, intent orderintent.Place
 	if strings.TrimSpace(prepare.Result.OrderKey) == "" {
 		return tradingflow.MutationResult{}, fmt.Errorf("place prepare response did not include order key")
 	}
+	if prepare.Result.PreparedOrderInfo.NeedExchange > 0 {
+		if !c.tradingPolicy.DangerousAutomation.AcceptFXConsent {
+			return tradingflow.MutationResult{}, c.buildPostPrepareFXBranch(ctx, prepare.Result.PreparedOrderInfo.NeedExchange)
+		}
+		c.prefetchPostPrepareFXContext(ctx)
+		autoAcceptFXConsent = true
+	}
 
 	var create mutationEnvelope[cancelResult]
 	if err := c.postTradingJSONWithHeaders(ctx, fmt.Sprintf("%s/api/v2/wts/trading/order/create", c.certBaseURL), bodyCreate, map[string]string{
 		"X-Order-Key": prepare.Result.OrderKey,
 	}, &create); err != nil {
 		return tradingflow.MutationResult{}, err
+	}
+	if autoAcceptFXConsent {
+		c.acceptPostPrepareFXConsent(ctx)
 	}
 	if strings.TrimSpace(create.Result.UUID) != "" &&
 		strings.TrimSpace(create.Result.Modulus) != "" &&
@@ -181,12 +224,14 @@ func classifyPlacePrepareFailure(err error) error {
 	case tradingflow.BranchFundingRequired:
 		return &tradingflow.BranchRequiredError{
 			Branch:        tradingflow.BranchFundingRequired,
+			Source:        tradingflow.BranchSourcePrepareRejection,
 			StatusCode:    statusErr.StatusCode,
 			BrokerMessage: message,
 		}
 	case tradingflow.BranchFXConsentRequired:
 		return &tradingflow.BranchRequiredError{
 			Branch:        tradingflow.BranchFXConsentRequired,
+			Source:        tradingflow.BranchSourcePrepareRejection,
 			StatusCode:    statusErr.StatusCode,
 			BrokerMessage: message,
 		}
@@ -238,6 +283,48 @@ func classifyPrepareBranch(body string, message string) tradingflow.Branch {
 	}
 
 	return ""
+}
+
+func (c *Client) buildPostPrepareFXBranch(ctx context.Context, needExchange float64) error {
+	branchErr := &tradingflow.BranchRequiredError{
+		Branch:     tradingflow.BranchFXConsentRequired,
+		Source:     tradingflow.BranchSourcePostPrepareConfirmation,
+		StatusCode: 200,
+		FX: &tradingflow.FXConfirmationContext{
+			NeedExchangeUSD: needExchange,
+		},
+	}
+
+	if turnedOn, err := c.getTradingSettingToggle(ctx, "GETTING_BACK_KRW"); err == nil {
+		branchErr.FX.GettingBackKRWKnown = true
+		branchErr.FX.GettingBackKRW = turnedOn
+	}
+
+	if quote, err := c.getExchangeQuoteForBuy(ctx); err == nil {
+		branchErr.FX.RateQuoteID = strings.TrimSpace(quote.Result.RateQuoteID)
+		branchErr.FX.ValidFrom = strings.TrimSpace(quote.Result.ValidFrom)
+		branchErr.FX.ValidTill = strings.TrimSpace(quote.Result.ValidTill)
+
+		rate := quote.Result.USDRate
+		if rate <= 0 {
+			rate = quote.Result.DisplayUSDRate
+		}
+		if rate > 0 {
+			branchErr.FX.USDExchangeRate = rate
+			branchErr.FX.EstimatedExchangeKRW = math.Round(needExchange * rate)
+		}
+	}
+
+	return branchErr
+}
+
+func (c *Client) acceptPostPrepareFXConsent(ctx context.Context) {
+	_ = c.setTradingSettingToggle(ctx, "EXCHANGE_INFO_CHECK", true)
+}
+
+func (c *Client) prefetchPostPrepareFXContext(ctx context.Context) {
+	_, _ = c.getTradingSettingToggle(ctx, "GETTING_BACK_KRW")
+	_, _ = c.getExchangeQuoteForBuy(ctx)
 }
 
 func extractBrokerMessage(body string) string {
@@ -480,8 +567,40 @@ func (c *Client) getUSDBaseExchangeRate(ctx context.Context) (float64, error) {
 	return envelope.Result.Rate, nil
 }
 
+func (c *Client) getTradingSettingToggle(ctx context.Context, category string) (bool, error) {
+	var envelope tradingSettingToggleEnvelope
+	endpoint := fmt.Sprintf("%s/api/v1/trading/settings/toggle/find?categoryName=%s", c.apiBaseURL, url.QueryEscape(category))
+	if err := c.getJSON(ctx, endpoint, &envelope); err != nil {
+		return false, err
+	}
+	return envelope.Result.TurnedOn, nil
+}
+
+func (c *Client) setTradingSettingToggle(ctx context.Context, category string, turnedOn bool) error {
+	body, err := json.Marshal(map[string]any{
+		"categoryName": category,
+		"turnedOn":     turnedOn,
+	})
+	if err != nil {
+		return err
+	}
+	return c.postEmptyJSONWithBody(ctx, c.apiBaseURL+"/api/v1/trading/settings/toggle", body)
+}
+
+func (c *Client) getExchangeQuoteForBuy(ctx context.Context) (exchangeQuoteForBuyEnvelope, error) {
+	var envelope exchangeQuoteForBuyEnvelope
+	if err := c.getJSON(ctx, c.apiBaseURL+"/api/v1/exchange/current-quote/for-buy", &envelope); err != nil {
+		return exchangeQuoteForBuyEnvelope{}, err
+	}
+	return envelope, nil
+}
+
 func (c *Client) postEmptyJSON(ctx context.Context, endpoint string) error {
 	return c.postRawJSON(ctx, endpoint, []byte("{}"))
+}
+
+func (c *Client) postEmptyJSONWithBody(ctx context.Context, endpoint string, body []byte) error {
+	return c.postRawJSON(ctx, endpoint, body)
 }
 
 func (c *Client) postRawJSON(ctx context.Context, endpoint string, body []byte) error {

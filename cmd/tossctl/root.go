@@ -116,12 +116,15 @@ func newAppContext(opts *rootOptions) (*appContext, error) {
 	}
 
 	loginConfig := auth.DefaultLoginConfig(paths.CacheDir)
-	client := tossclient.New(tossclient.Config{Session: sess})
 	configService := config.NewService(paths.ConfigFile)
 	cfg, err := configService.Load(context.Background())
 	if err != nil {
 		return nil, err
 	}
+	client := tossclient.New(tossclient.Config{
+		Session:       sess,
+		TradingPolicy: cfg.Trading,
+	})
 	permissionService := permissions.NewService(paths.PermissionFile)
 
 	return &appContext{

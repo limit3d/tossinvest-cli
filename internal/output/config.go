@@ -20,7 +20,7 @@ func WriteConfigStatus(w io.Writer, format Format, status config.Status) error {
 	case FormatCSV:
 		writer := csv.NewWriter(w)
 		if err := writer.Write([]string{
-			"config_file", "exists", "schema_version", "source_schema_version", "grant", "place", "cancel", "amend", "allow_live_order_actions", "complete_trade_auth", "accept_product_ack", "legacy_fields",
+			"config_file", "exists", "schema_version", "source_schema_version", "grant", "place", "cancel", "amend", "allow_live_order_actions", "complete_trade_auth", "accept_product_ack", "accept_fx_consent", "legacy_fields",
 		}); err != nil {
 			return err
 		}
@@ -36,6 +36,7 @@ func WriteConfigStatus(w io.Writer, format Format, status config.Status) error {
 			strconv.FormatBool(status.Trading.AllowLiveOrderActions),
 			strconv.FormatBool(status.Trading.DangerousAutomation.CompleteTradeAuth),
 			strconv.FormatBool(status.Trading.DangerousAutomation.AcceptProductAck),
+			strconv.FormatBool(status.Trading.DangerousAutomation.AcceptFXConsent),
 			strings.Join(status.LegacyFields, "|"),
 		}); err != nil {
 			return err

@@ -22,6 +22,7 @@ func TestCheckDangerousAutomationEnabled(t *testing.T) {
 		Trading: config.Trading{
 			DangerousAutomation: config.DangerousAutomation{
 				CompleteTradeAuth: true,
+				AcceptFXConsent:   true,
 			},
 		},
 	})
@@ -29,6 +30,9 @@ func TestCheckDangerousAutomationEnabled(t *testing.T) {
 		t.Fatalf("expected warn status, got %s", check.Status)
 	}
 	if !strings.Contains(check.Detail, "complete_trade_auth") {
+		t.Fatalf("unexpected dangerous automation detail: %s", check.Detail)
+	}
+	if !strings.Contains(check.Detail, "accept_fx_consent") {
 		t.Fatalf("unexpected dangerous automation detail: %s", check.Detail)
 	}
 }

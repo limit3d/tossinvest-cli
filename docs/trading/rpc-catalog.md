@@ -36,10 +36,12 @@ Current capture scope:
 | `captured` | `POST` | `wts-cert-api.tossinvest.com` | `/api/v2/wts/trading/order/cancel/prepare/2026-03-11/5` | single-order cancel preflight mutation | returned `200` when the user clicked inline `취소` on the amended TSLL order |
 | `captured` | `POST` | `wts-cert-api.tossinvest.com` | `/api/v3/wts/trading/order/cancel/2026-03-11/5` | single-order cancel live mutation | returned `200` and cleared the pending TSLL order |
 | `observed` | `GET` | `wts-api.tossinvest.com` | `/api/v1/trading/settings/toggle/find?categoryName=TRADE_WITHOUT_CONFIRM` | fetch trade-without-confirm preference | may become relevant for permission UX mapping |
+| `captured` | `GET` | `wts-api.tossinvest.com` | `/api/v1/trading/settings/toggle/find?categoryName=GETTING_BACK_KRW` | fetch FX-return preference before the browser FX prompt | observed only after the confirmation-dialog `구매` click on 2026-03-13 |
+| `captured` | `GET` | `wts-api.tossinvest.com` | `/api/v1/exchange/current-quote/for-buy` | fetch live exchange quote for the FX-confirmation modal | returned `rateQuoteId`, `usdRate`, and validity window immediately before the FX prompt on 2026-03-13 |
 | `observed` | `GET` | `wts-cert-api.tossinvest.com` | `/api/v2/trading/settings/investor-exchange-choice-type` | exchange-choice setting | likely affects market routing |
 | `captured` | `GET` | `wts-api.tossinvest.com` | `/api/v1/account/investment-propensity/eligible/with-contract?financialQualification=USA_STOCK&highRiskTradingCategory=ETF` | overseas leverage eligibility check | fetched immediately before `order/prepare` |
 | `captured` | `GET` | `wts-api.tossinvest.com` | `/api/v1/product-eligibility/overseas-leverage-etp/trading` | overseas leverage product eligibility check | fetched immediately before `order/prepare` |
-| `captured` | `POST` | `wts-api.tossinvest.com` | `/api/v1/trading/settings/toggle` | post-trade setting update | observed immediately after successful `order/create`; likely related to confirmation preference |
+| `captured` | `POST` | `wts-api.tossinvest.com` | `/api/v1/trading/settings/toggle` | exchange-confirmation acknowledgement update | observed on FX-modal `확인` click with `{"categoryName":"EXCHANGE_INFO_CHECK","turnedOn":true}` |
 
 ## Order History and Sidecar Endpoints
 
@@ -169,6 +171,33 @@ Current inference:
 - insufficient buying power is enforced at `prepare`, not only through local preview widgets
 - there is likely at least one additional step after `prepare` for successful orders, because this path stops at a broker-side blocking alert rather than creating a pending order
 - when funds are insufficient, the user may be redirected into a top-up path outside the order panel before retrying `prepare`
+
+### Post-Prepare FX Prompt Path
+
+Observed on 2026-03-13 in a headed desktop web replay of `TSLL` 1주 `1000 KRW`:
+
+- first `구매하기` click:
+  - `POST /api/v2/wts/trading/order/prepare` -> `200 OK`
+  - response body included `preparedOrderInfo.needExchange: 0.68`
+  - UI showed only the normal order confirmation dialog
+- confirmation-dialog `구매` click:
+  - `GET /api/v1/trading/settings/toggle/find?categoryName=GETTING_BACK_KRW` -> `200 OK`
+  - `GET /api/v1/exchange/current-quote/for-buy` -> `200 OK`
+  - UI then showed:
+    - `0.68달러가 부족해요`
+    - `주식 구매를 위해 환전할게요`
+    - `주문이 취소되면 계좌에는 달러로 남아있어요.`
+- no `order/create` request was observed before that FX modal
+- FX-modal `확인` click:
+  - `POST /api/v2/wts/trading/order/create`
+  - `POST /api/v1/trading/settings/toggle`
+  - the toggle body was `{"categoryName":"EXCHANGE_INFO_CHECK","turnedOn":true}`
+
+Current inference:
+
+- the desktop web FX prompt is not a plain `prepare` rejection
+- it is a post-prepare confirmation branch that depends on `needExchange` and an exchange-quote fetch
+- the actual confirmation step is not a separate FX-mutation RPC; it is the same `order/create` mutation gated behind the FX modal plus a sidecar toggle update
 
 ### Successful Filled Buy Path
 

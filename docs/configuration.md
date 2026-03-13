@@ -32,7 +32,8 @@ tossctl config init
     "allow_live_order_actions": false,
     "dangerous_automation": {
       "complete_trade_auth": false,
-      "accept_product_ack": false
+      "accept_product_ack": false,
+      "accept_fx_consent": false
     }
   }
 }
@@ -56,6 +57,9 @@ tossctl config init
 - `trading.dangerous_automation.accept_product_ack`
   - product acknowledgement 분기를 자동 수락하도록 허용할지
   - 해당 분기 handler가 구현된 빌드에서만 실제로 효과가 있습니다
+- `trading.dangerous_automation.accept_fx_consent`
+  - post-prepare FX confirmation branch를 자동 수락하고 같은 주문을 계속 진행하도록 허용할지
+  - 현재는 `prepare` 성공 후 `needExchange > 0`인 미국주식 KRW 매수 경로에만 연결됩니다
 
 즉, 각 액션은 config에서 먼저 열려 있어야 하고, 그 다음에도 기존 실행 게이트를 통과해야 합니다.
 

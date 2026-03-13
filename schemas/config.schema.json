@@ -48,11 +48,16 @@
             "accept_product_ack": {
               "type": "boolean",
               "default": false
+            },
+            "accept_fx_consent": {
+              "type": "boolean",
+              "default": false
             }
           },
           "required": [
             "complete_trade_auth",
-            "accept_product_ack"
+            "accept_product_ack",
+            "accept_fx_consent"
           ]
         }
       },

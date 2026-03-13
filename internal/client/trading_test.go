@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/junghoonkye/tossinvest-cli/internal/config"
 	"github.com/junghoonkye/tossinvest-cli/internal/orderintent"
 	"github.com/junghoonkye/tossinvest-cli/internal/session"
 	tradingflow "github.com/junghoonkye/tossinvest-cli/internal/trading"
@@ -720,6 +721,227 @@ func TestPlacePendingOrderReturnsFXConsentRequiredFromPrepare(t *testing.T) {
 	}
 	if branchErr.StatusCode != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", branchErr.StatusCode)
+	}
+}
+
+func TestPlacePendingOrderReturnsFXConsentRequiredAfterPrepareNeedExchange(t *testing.T) {
+	t.Parallel()
+
+	createCalled := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v2/search/stocks":
+			_, _ = w.Write([]byte(`{"result":{"stocks":[{"stockCode":"US20220809012","stockName":"TSLL","matchType":"EXACT"}]}}`))
+		case "/api/v2/stock-infos/US20220809012":
+			_, _ = w.Write([]byte(`{"result":{"symbol":"TSLL","name":"TSLL","currency":"USD","status":"N","market":{"code":"NSQ","displayName":"NASDAQ"}}}`))
+		case "/api/v1/product/stock-prices":
+			_, _ = w.Write([]byte(`{"result":[{"productCode":"US20220809012","currency":"USD","base":14.38,"close":14.4,"closeKrw":21208,"volume":13409779}]}`))
+		case "/api/v1/exchange/usd/base-exchange-rate":
+			_, _ = w.Write([]byte(`{"result":{"rate":1472.8}}`))
+		case "/api/v2/wts/trading/order/prepare":
+			_, _ = w.Write([]byte(`{"result":{"preparedOrderInfo":{"needExchange":0.68},"orderKey":"trade::session::test::place","authRequired":{"required":false,"simpleTrade":true,"verifier":null}}}`))
+		case "/api/v1/trading/settings/toggle/find":
+			if got := r.URL.Query().Get("categoryName"); got != "GETTING_BACK_KRW" {
+				t.Fatalf("unexpected categoryName: %q", got)
+			}
+			_, _ = w.Write([]byte(`{"result":{"categoryName":"GETTING_BACK_KRW","turnedOn":false}}`))
+		case "/api/v1/exchange/current-quote/for-buy":
+			_, _ = w.Write([]byte(`{"result":{"rateQuoteId":"quote-123","buyCurrency":"USD","sellCurrency":"KRW","validFrom":"2026-03-13T06:47:41Z","validTill":"2026-03-13T06:52:40Z","usdRate":1500.21375,"displayUsdRate":1500.21}}`))
+		case "/api/v2/wts/trading/order/create":
+			createCalled = true
+			_, _ = w.Write([]byte(`{"result":{"message":"주문 접수 되었어요."}}`))
+		default:
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := New(Config{
+		HTTPClient:  server.Client(),
+		APIBaseURL:  server.URL,
+		InfoBaseURL: server.URL,
+		CertBaseURL: server.URL,
+		Session: &session.Session{
+			Cookies: map[string]string{"SESSION": "test-session"},
+			Headers: map[string]string{"App-Version": "v260311.2121"},
+			Storage: map[string]string{"localStorage:qr-tabId": "browser-tab-test123"},
+		},
+	})
+
+	intent, err := orderintent.NormalizePlace(orderintent.PlaceInput{
+		Symbol:       "TSLL",
+		Market:       "us",
+		Side:         "buy",
+		OrderType:    "limit",
+		Quantity:     1,
+		Price:        1000,
+		CurrencyMode: "KRW",
+	})
+	if err != nil {
+		t.Fatalf("NormalizePlace returned error: %v", err)
+	}
+
+	_, err = client.PlacePendingOrder(context.Background(), intent)
+	var branchErr *tradingflow.BranchRequiredError
+	if !errors.As(err, &branchErr) {
+		t.Fatalf("expected BranchRequiredError, got %v", err)
+	}
+	if branchErr.Branch != tradingflow.BranchFXConsentRequired {
+		t.Fatalf("expected fx-consent branch, got %q", branchErr.Branch)
+	}
+	if branchErr.Source != tradingflow.BranchSourcePostPrepareConfirmation {
+		t.Fatalf("expected post-prepare source, got %q", branchErr.Source)
+	}
+	if branchErr.FX == nil {
+		t.Fatal("expected FX context")
+	}
+	if branchErr.FX.NeedExchangeUSD != 0.68 {
+		t.Fatalf("expected needExchange 0.68, got %v", branchErr.FX.NeedExchangeUSD)
+	}
+	if branchErr.FX.EstimatedExchangeKRW != 1020 {
+		t.Fatalf("expected estimated exchange KRW 1020, got %v", branchErr.FX.EstimatedExchangeKRW)
+	}
+	if branchErr.FX.USDExchangeRate != 1500.21375 {
+		t.Fatalf("expected usd exchange rate 1500.21375, got %v", branchErr.FX.USDExchangeRate)
+	}
+	if branchErr.FX.RateQuoteID != "quote-123" {
+		t.Fatalf("expected quote id quote-123, got %q", branchErr.FX.RateQuoteID)
+	}
+	if !branchErr.FX.GettingBackKRWKnown {
+		t.Fatal("expected GETTING_BACK_KRW state to be known")
+	}
+	if branchErr.FX.GettingBackKRW {
+		t.Fatal("expected GETTING_BACK_KRW to be false")
+	}
+	if createCalled {
+		t.Fatal("order/create should not be called when post-prepare FX confirmation is required")
+	}
+}
+
+func TestPlacePendingOrderAutoAcceptsFXConsentWhenConfigured(t *testing.T) {
+	t.Parallel()
+
+	var paths []string
+	var orderKeys []string
+	var toggleBody map[string]any
+	pendingCalls := 0
+	today := time.Now().Format("2006-01-02")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v2/search/stocks":
+			_, _ = w.Write([]byte(`{"result":{"stocks":[{"stockCode":"US20220809012","stockName":"TSLL","matchType":"EXACT"}]}}`))
+		case "/api/v2/stock-infos/US20220809012":
+			_, _ = w.Write([]byte(`{"result":{"symbol":"TSLL","name":"TSLL","currency":"USD","status":"N","market":{"code":"NSQ","displayName":"NASDAQ"}}}`))
+		case "/api/v1/product/stock-prices":
+			_, _ = w.Write([]byte(`{"result":[{"productCode":"US20220809012","currency":"USD","base":14.38,"close":14.4,"closeKrw":21208,"volume":13409779}]}`))
+		case "/api/v1/exchange/usd/base-exchange-rate":
+			_, _ = w.Write([]byte(`{"result":{"rate":1479.8}}`))
+		case "/api/v2/wts/trading/order/prepare":
+			paths = append(paths, r.URL.Path)
+			orderKeys = append(orderKeys, r.Header.Get("X-Order-Key"))
+			_, _ = w.Write([]byte(`{"result":{"preparedOrderInfo":{"needExchange":0.68},"orderKey":"trade::session::test::place","authRequired":{"required":false,"simpleTrade":true,"verifier":null}}}`))
+		case "/api/v1/trading/settings/toggle/find":
+			paths = append(paths, r.URL.Path+"?"+r.URL.RawQuery)
+			_, _ = w.Write([]byte(`{"result":{"categoryName":"GETTING_BACK_KRW","turnedOn":false}}`))
+		case "/api/v1/exchange/current-quote/for-buy":
+			paths = append(paths, r.URL.Path)
+			_, _ = w.Write([]byte(`{"result":{"rateQuoteId":"quote-123","buyCurrency":"USD","sellCurrency":"KRW","validFrom":"2026-03-13T06:47:41Z","validTill":"2026-03-13T06:52:40Z","usdRate":1505.29,"displayUsdRate":1505.29}}`))
+		case "/api/v2/wts/trading/order/create":
+			paths = append(paths, r.URL.Path)
+			orderKeys = append(orderKeys, r.Header.Get("X-Order-Key"))
+			_, _ = w.Write([]byte(`{"result":{"message":"주문 접수 되었어요."}}`))
+		case "/api/v1/trading/settings/toggle":
+			paths = append(paths, r.URL.Path)
+			body, _ := io.ReadAll(r.Body)
+			if err := json.Unmarshal(body, &toggleBody); err != nil {
+				t.Fatalf("toggle body was not valid json: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"result":{"categoryName":"EXCHANGE_INFO_CHECK","turnedOn":true}}`))
+		case "/api/v1/trading/orders/histories/all/pending":
+			pendingCalls++
+			if pendingCalls == 1 {
+				_, _ = w.Write([]byte(`{"result":[{"stockCode":"US20220809012","orderedDate":"` + today + `","orderNo":16,"tradeType":"buy","orderPrice":1000,"orderUsdPrice":0.6758,"quantity":1,"pendingQuantity":1,"orderPriceTypeCode":"00","isFractionalOrder":false,"isAfterMarketOrder":false,"status":"체결대기"}]}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"result":[]}`))
+		default:
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := New(Config{
+		HTTPClient:  server.Client(),
+		APIBaseURL:  server.URL,
+		InfoBaseURL: server.URL,
+		CertBaseURL: server.URL,
+		Session: &session.Session{
+			Cookies: map[string]string{"SESSION": "test-session"},
+			Headers: map[string]string{"App-Version": "v260311.2121"},
+			Storage: map[string]string{"localStorage:qr-tabId": "browser-tab-test123"},
+		},
+		TradingPolicy: config.Trading{
+			DangerousAutomation: config.DangerousAutomation{
+				AcceptFXConsent: true,
+			},
+		},
+	})
+
+	intent, err := orderintent.NormalizePlace(orderintent.PlaceInput{
+		Symbol:       "TSLL",
+		Market:       "us",
+		Side:         "buy",
+		OrderType:    "limit",
+		Quantity:     1,
+		Price:        1000,
+		CurrencyMode: "KRW",
+	})
+	if err != nil {
+		t.Fatalf("NormalizePlace returned error: %v", err)
+	}
+
+	result, err := client.PlacePendingOrder(context.Background(), intent)
+	if err != nil {
+		t.Fatalf("PlacePendingOrder returned error: %v", err)
+	}
+	if result.Status != "accepted_pending" {
+		t.Fatalf("expected accepted_pending result, got %q", result.Status)
+	}
+	if result.OrderID != today+"/16" {
+		t.Fatalf("expected reconciled order id %s/16, got %q", today, result.OrderID)
+	}
+	if len(orderKeys) < 2 {
+		t.Fatalf("expected prepare and create order-key entries, got %#v", orderKeys)
+	}
+	if orderKeys[0] != "" {
+		t.Fatalf("prepare request should not include x-order-key: %#v", orderKeys)
+	}
+	if orderKeys[1] != "trade::session::test::place" {
+		t.Fatalf("unexpected create x-order-key header: %#v", orderKeys)
+	}
+	if toggleBody["categoryName"] != "EXCHANGE_INFO_CHECK" {
+		t.Fatalf("unexpected toggle category: %#v", toggleBody)
+	}
+	if toggleBody["turnedOn"] != true {
+		t.Fatalf("expected EXCHANGE_INFO_CHECK toggle to be turned on: %#v", toggleBody)
+	}
+
+	createIndex := -1
+	toggleIndex := -1
+	for i, path := range paths {
+		if path == "/api/v2/wts/trading/order/create" && createIndex == -1 {
+			createIndex = i
+		}
+		if path == "/api/v1/trading/settings/toggle" && toggleIndex == -1 {
+			toggleIndex = i
+		}
+	}
+	if createIndex == -1 || toggleIndex == -1 {
+		t.Fatalf("expected both create and toggle calls, got %v", paths)
+	}
+	if createIndex > toggleIndex {
+		t.Fatalf("expected create to happen before toggle, got %v", paths)
 	}
 }
 
