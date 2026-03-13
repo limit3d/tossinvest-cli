@@ -77,6 +77,7 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
@@ -87,10 +88,10 @@ jobs:
             dist/tossctl-darwin-amd64.tar.gz.sha256
           )
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+          if gh release view "$TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber --repo "$GH_REPO"
           else
-            gh release create "$TAG" "${ASSETS[@]}" --title "$TAG"
+            gh release create "$TAG" "${ASSETS[@]}" --title "$TAG" --repo "$GH_REPO"
           fi
 
   update-homebrew-tap:
