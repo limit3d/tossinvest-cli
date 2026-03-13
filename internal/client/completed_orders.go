@@ -192,7 +192,9 @@ func matchesDelayedCancelRecoveryHint(order domain.Order, requestedOrderID strin
 	if hint.OrderDate != "" && order.OrderDate != "" && order.OrderDate != hint.OrderDate {
 		return false
 	}
-	if hint.Symbol != "" && !strings.EqualFold(order.Symbol, hint.Symbol) {
+	if hint.Symbol != "" &&
+		!strings.EqualFold(order.Symbol, hint.Symbol) &&
+		!strings.EqualFold(order.Name, hint.Symbol) {
 		return false
 	}
 	if hint.Market != "" && order.Market != "" && !strings.EqualFold(order.Market, hint.Market) {
@@ -216,6 +218,7 @@ func parseCompletedOrder(raw json.RawMessage, market string) domain.Order {
 	var payload struct {
 		OrderedAt      string `json:"orderedAt"`
 		LastExecutedAt string `json:"lastExecutedAt"`
+		Version        string `json:"version"`
 		OrderNo        any    `json:"orderNo"`
 		OrderID        string `json:"orderId"`
 
@@ -252,7 +255,7 @@ func parseCompletedOrder(raw json.RawMessage, market string) domain.Order {
 	order.Price = payload.OrderPrice.KRW
 	order.AverageExecutionPrice = payload.AverageExecutionPrice.KRW
 	order.OrderDate = payload.UserOrderDate
-	order.SubmittedAt = parseOrderTime(payload.LastExecutedAt, payload.OrderedAt)
+	order.SubmittedAt = parseOrderTime(payload.LastExecutedAt, payload.Version, payload.OrderedAt)
 	return order
 }
 

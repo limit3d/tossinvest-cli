@@ -351,3 +351,72 @@ func TestFindCompletedOrderFromLineageHintFailsWhenAmbiguous(t *testing.T) {
 		t.Fatal("expected no successful recovery on ambiguity")
 	}
 }
+
+func TestFindCompletedOrderFromLineageHintRecoversUsingVersionTimestampAndNameFallback(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v2/trading/my-orders/markets/us/by-date/completed":
+			_, _ = w.Write([]byte(`{
+			  "result": {
+			    "body": [
+			      {
+			        "orderedAt": "2026-03-13 00:00:00.000",
+			        "lastExecutedAt": null,
+			        "version": "2026-03-13T15:24:20.446990",
+			        "orderNo": 6,
+			        "orderId": "completed-order-id",
+			        "stockCode": "US20220809012",
+			        "stockName": "TSLL",
+			        "symbol": null,
+			        "tradeType": "buy",
+			        "status": "취소",
+			        "orderQuantity": 1,
+			        "executedQuantity": 0,
+			        "userOrderDate": "2026-03-13",
+			        "orderPrice": {"krw": 500},
+			        "averageExecutionPrice": {"krw": 0}
+			      }
+			    ]
+			  }
+			}`))
+		default:
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := New(Config{
+		HTTPClient:  server.Client(),
+		APIBaseURL:  server.URL,
+		InfoBaseURL: server.URL,
+		CertBaseURL: server.URL,
+		Session: &session.Session{
+			Cookies: map[string]string{"SESSION": "test-session"},
+			Headers: map[string]string{"App-Version": "v260311.1636", "Browser-Tab-Id": "browser-tab-test"},
+		},
+	})
+
+	order, ok, err := client.FindCompletedOrderFromLineageHint(context.Background(), "2026-03-13/5", "us", orderlineage.Entry{
+		Kind:      "cancel",
+		Symbol:    "TSLL",
+		Market:    "us",
+		Quantity:  1,
+		Price:     500,
+		OrderDate: "2026-03-13",
+		UpdatedAt: time.Date(2026, 3, 13, 15, 24, 18, 0, time.Local),
+	})
+	if err != nil {
+		t.Fatalf("FindCompletedOrderFromLineageHint returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected delayed recovery hit")
+	}
+	if order.ID != "2026-03-13/6" {
+		t.Fatalf("expected recovered order id 2026-03-13/6, got %q", order.ID)
+	}
+	if order.ResolvedFromID != "2026-03-13/5" {
+		t.Fatalf("expected resolved_from_id 2026-03-13/5, got %q", order.ResolvedFromID)
+	}
+}

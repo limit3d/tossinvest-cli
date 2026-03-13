@@ -236,6 +236,9 @@ func parseOrderTime(values ...string) *time.Time {
 		if value == "" {
 			continue
 		}
+		if parsed, err := time.ParseInLocation("2006-01-02T15:04:05.999999999", value, time.Local); err == nil {
+			return &parsed
+		}
 		if parsed, err := time.ParseInLocation("2006-01-02 15:04:05.000", value, time.Local); err == nil {
 			return &parsed
 		}

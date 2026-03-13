@@ -168,9 +168,41 @@ Scope: US buy limit / KRW / non-fractional only
   - trading permission revoked again after verification
   - local `config.json` restored to disabled state again
 
+## Post-Funding Live Retest
+
+- operator prepared `600 KRW` of orderable / withdrawable KRW before the rerun
+- live inputs:
+  - `TSLL` 1주 `500 KRW`
+- observed result:
+  - `order place` no longer stopped at funding guidance
+  - result: `accepted_pending`
+  - pending order reference: `2026-03-13/5`
+- interpretation:
+  - the funding gate was cleared for this low-price pending order
+  - no `fx_consent_required` branch appeared on this specific input
+- safety follow-up:
+  - the pending order was canceled immediately
+  - immediate cancel result still ended with the known warning:
+    - `Pending order disappeared, but the canceled completed-history row is not visible yet.`
+- delayed rollover live result:
+  - `orders completed --market us` later showed the canceled row as `2026-03-13/6`
+  - the first `order show 2026-03-13/5` retry still failed
+  - root cause:
+    - completed-history rows used `version` as the meaningful recency timestamp
+    - `version` arrived as a timezone-free local timestamp string
+    - some completed rows also had `symbol: null`, so matching had to fall back to `stockName`
+  - after fixing the parser and rerunning read-only verification:
+    - `order show 2026-03-13/5 --market us` resolved successfully to `2026-03-13/6`
+    - `resolved_from_id` was populated correctly
+- safety outcome:
+  - pending orders returned to `[]`
+  - trading permission revoked again after verification
+  - local `config.json` restored to disabled state again
+
 ## Still Pending
 
 - live re-test of `order amend` after lineage/reconciliation changes
+- live capture of an explicit `fx_consent_required` broker message after funding is no longer the blocking branch
 - evidence-driven confirmation of whether the observed interactive-auth branch for `amend` is account-specific or generally expected
 
 ## Next Operator Steps
