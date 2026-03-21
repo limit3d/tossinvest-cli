@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2026-03-21
+
+### Removed
+- **MCP server** (`tossctl-mcp`) — CLI 자체가 AI 에이전트에서 직접 실행 가능하므로 불필요한 추상화 제거
+- `make build-mcp` Makefile 타겟
+- Release workflow에서 tossctl-mcp 바이너리
+
 ## [0.2.2] - 2026-03-21
 
 ### Added

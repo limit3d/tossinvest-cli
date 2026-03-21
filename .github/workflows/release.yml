@@ -47,18 +47,13 @@ jobs:
             -ldflags "-X github.com/junghoonkye/tossinvest-cli/internal/version.Version=${VERSION} -X github.com/junghoonkye/tossinvest-cli/internal/version.Commit=${COMMIT} -X github.com/junghoonkye/tossinvest-cli/internal/version.Date=${DATE}" \
             -o dist/${{ matrix.asset }}/tossctl \
             ./cmd/tossctl
-          go build \
-            -trimpath \
-            -ldflags "-X github.com/junghoonkye/tossinvest-cli/internal/version.Version=${VERSION} -X github.com/junghoonkye/tossinvest-cli/internal/version.Commit=${COMMIT} -X github.com/junghoonkye/tossinvest-cli/internal/version.Date=${DATE}" \
-            -o dist/${{ matrix.asset }}/tossctl-mcp \
-            ./cmd/tossctl-mcp
 
       - name: Bundle auth helper
         run: cp -R auth-helper dist/${{ matrix.asset }}/auth-helper
 
       - name: Package artifact
         run: |
-          tar -C dist/${{ matrix.asset }} -czf dist/${{ matrix.asset }}.tar.gz tossctl tossctl-mcp auth-helper
+          tar -C dist/${{ matrix.asset }} -czf dist/${{ matrix.asset }}.tar.gz tossctl auth-helper
           shasum -a 256 dist/${{ matrix.asset }}.tar.gz > dist/${{ matrix.asset }}.tar.gz.sha256
 
       - name: Upload artifact
