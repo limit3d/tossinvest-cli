@@ -25,6 +25,10 @@
           "type": "boolean",
           "default": false
         },
+        "sell": {
+          "type": "boolean",
+          "default": false
+        },
         "cancel": {
           "type": "boolean",
           "default": false

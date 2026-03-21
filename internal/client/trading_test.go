@@ -397,6 +397,36 @@ func TestBuildPlaceBodyMatchesCapturedShape(t *testing.T) {
 	}
 }
 
+func TestBuildPlaceBodySellTradeType(t *testing.T) {
+	intent, err := orderintent.NormalizePlace(orderintent.PlaceInput{
+		Symbol:       "TSLL",
+		Market:       "us",
+		Side:         "sell",
+		OrderType:    "limit",
+		Quantity:     1,
+		Price:        500,
+		CurrencyMode: "KRW",
+	})
+	if err != nil {
+		t.Fatalf("NormalizePlace returned error: %v", err)
+	}
+
+	meta := stockPriceMetadata{
+		Close:        14.4,
+		CloseKRW:     21208,
+		ExchangeRate: 1472.8,
+	}
+
+	body, err := buildPlaceBody("US20220809012", "NSQ", intent, meta, true)
+	if err != nil {
+		t.Fatalf("buildPlaceBody returned error: %v", err)
+	}
+	expected := `{"agreedOver100Million":false,"allowAutoExchange":true,"currencyMode":"KRW","isReservationOrder":false,"marginTrading":false,"market":"NSQ","max":false,"openPriceSinglePriceYn":false,"orderAmount":0,"orderPriceType":"00","price":0.3395,"quantity":1,"stockCode":"US20220809012","tradeType":"sell","withOrderKey":true}`
+	if string(body) != expected {
+		t.Fatalf("unexpected sell prepare body:\nwant: %s\ngot:  %s", expected, string(body))
+	}
+}
+
 func TestPlacePendingOrderSendsXOrderKeyOnCreate(t *testing.T) {
 	t.Parallel()
 

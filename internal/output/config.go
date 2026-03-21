@@ -20,7 +20,7 @@ func WriteConfigStatus(w io.Writer, format Format, status config.Status) error {
 	case FormatCSV:
 		writer := csv.NewWriter(w)
 		if err := writer.Write([]string{
-			"config_file", "exists", "schema_version", "source_schema_version", "grant", "place", "cancel", "amend", "allow_live_order_actions", "complete_trade_auth", "accept_product_ack", "accept_fx_consent", "legacy_fields",
+			"config_file", "exists", "schema_version", "source_schema_version", "grant", "place", "sell", "cancel", "amend", "allow_live_order_actions", "complete_trade_auth", "accept_product_ack", "accept_fx_consent", "legacy_fields",
 		}); err != nil {
 			return err
 		}
@@ -31,6 +31,7 @@ func WriteConfigStatus(w io.Writer, format Format, status config.Status) error {
 			strconv.Itoa(status.SourceSchemaVersion),
 			strconv.FormatBool(status.Trading.Grant),
 			strconv.FormatBool(status.Trading.Place),
+			strconv.FormatBool(status.Trading.Sell),
 			strconv.FormatBool(status.Trading.Cancel),
 			strconv.FormatBool(status.Trading.Amend),
 			strconv.FormatBool(status.Trading.AllowLiveOrderActions),
@@ -61,9 +62,10 @@ func WriteConfigStatus(w io.Writer, format Format, status config.Status) error {
 		}
 		if _, err := fmt.Fprintf(
 			w,
-			"Trading Grant: %t\nTrading Place: %t\nTrading Cancel: %t\nTrading Amend: %t\nAllow Live Order Actions: %t\nDangerous Automation: %s\n",
+			"Trading Grant: %t\nTrading Place: %t\nTrading Sell: %t\nTrading Cancel: %t\nTrading Amend: %t\nAllow Live Order Actions: %t\nDangerous Automation: %s\n",
 			status.Trading.Grant,
 			status.Trading.Place,
+			status.Trading.Sell,
 			status.Trading.Cancel,
 			status.Trading.Amend,
 			status.Trading.AllowLiveOrderActions,

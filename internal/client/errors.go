@@ -17,6 +17,8 @@ func (e *StatusError) Error() string {
 	return fmt.Sprintf("unexpected status %d for %s", e.StatusCode, e.Endpoint)
 }
 
+
+
 type AuthError struct {
 	StatusCode int
 	Endpoint   string

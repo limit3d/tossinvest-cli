@@ -246,6 +246,175 @@ func TestPlaceFailsWhenActionDisabledInConfig(t *testing.T) {
 	}
 }
 
+func TestPlaceIntentSupportedAcceptsSell(t *testing.T) {
+	intent, err := orderintent.NormalizePlace(orderintent.PlaceInput{
+		Symbol:       "TSLL",
+		Market:       "us",
+		Side:         "sell",
+		OrderType:    "limit",
+		Quantity:     1,
+		Price:        500,
+		CurrencyMode: "KRW",
+	})
+	if err != nil {
+		t.Fatalf("NormalizePlace returned error: %v", err)
+	}
+	if !placeIntentSupported(intent) {
+		t.Fatal("expected placeIntentSupported to return true for sell intent")
+	}
+}
+
+func TestSellPlaceFailsWhenSellDisabledInConfig(t *testing.T) {
+	dir := t.TempDir()
+	permissionService := permissions.NewService(filepath.Join(dir, "permission.json"))
+	if _, err := permissionService.Grant(context.Background(), 5*time.Minute); err != nil {
+		t.Fatalf("Grant returned error: %v", err)
+	}
+
+	broker := &brokerStub{}
+	service := NewService(permissionService, config.Trading{
+		Place:                 true,
+		Sell:                  false,
+		AllowLiveOrderActions: true,
+	}, broker)
+	intent, err := orderintent.NormalizePlace(orderintent.PlaceInput{
+		Symbol:       "TSLL",
+		Market:       "us",
+		Side:         "sell",
+		OrderType:    "limit",
+		Quantity:     1,
+		Price:        500,
+		CurrencyMode: "KRW",
+	})
+	if err != nil {
+		t.Fatalf("NormalizePlace returned error: %v", err)
+	}
+
+	_, err = service.Place(context.Background(), intent, ExecuteOptions{
+		Execute:                    true,
+		DangerouslySkipPermissions: true,
+		Confirm:                    service.PreviewPlace(intent).ConfirmToken,
+	})
+	var disabled *DisabledActionError
+	if !errors.As(err, &disabled) || disabled.Action != "sell" {
+		t.Fatalf("expected sell action to be disabled, got %v", err)
+	}
+	if broker.placeCalled {
+		t.Fatal("broker should not have been called when sell is disabled")
+	}
+}
+
+func TestSellPlaceCallsBrokerWhenSellEnabled(t *testing.T) {
+	dir := t.TempDir()
+	permissionService := permissions.NewService(filepath.Join(dir, "permission.json"))
+	if _, err := permissionService.Grant(context.Background(), 5*time.Minute); err != nil {
+		t.Fatalf("Grant returned error: %v", err)
+	}
+
+	broker := &brokerStub{}
+	service := NewService(permissionService, config.Trading{
+		Place:                 true,
+		Sell:                  true,
+		AllowLiveOrderActions: true,
+	}, broker)
+	intent, err := orderintent.NormalizePlace(orderintent.PlaceInput{
+		Symbol:       "TSLL",
+		Market:       "us",
+		Side:         "sell",
+		OrderType:    "limit",
+		Quantity:     1,
+		Price:        500,
+		CurrencyMode: "KRW",
+	})
+	if err != nil {
+		t.Fatalf("NormalizePlace returned error: %v", err)
+	}
+
+	result, err := service.Place(context.Background(), intent, ExecuteOptions{
+		Execute:                    true,
+		DangerouslySkipPermissions: true,
+		Confirm:                    service.PreviewPlace(intent).ConfirmToken,
+	})
+	if err != nil {
+		t.Fatalf("Place returned error: %v", err)
+	}
+	if !broker.placeCalled {
+		t.Fatal("expected broker place to be called for sell")
+	}
+	if result.Status != "accepted_pending" {
+		t.Fatalf("expected accepted_pending, got %q", result.Status)
+	}
+}
+
+func TestPreviewPlaceSellDisabled(t *testing.T) {
+	dir := t.TempDir()
+	permissionService := permissions.NewService(filepath.Join(dir, "permission.json"))
+
+	service := NewService(permissionService, config.Trading{
+		Place:                 true,
+		Sell:                  false,
+		AllowLiveOrderActions: true,
+	}, nil)
+	intent, err := orderintent.NormalizePlace(orderintent.PlaceInput{
+		Symbol:       "TSLL",
+		Market:       "us",
+		Side:         "sell",
+		OrderType:    "limit",
+		Quantity:     1,
+		Price:        500,
+		CurrencyMode: "KRW",
+	})
+	if err != nil {
+		t.Fatalf("NormalizePlace returned error: %v", err)
+	}
+
+	preview := service.PreviewPlace(intent)
+	if preview.MutationReady {
+		t.Fatal("expected MutationReady to be false when sell is disabled")
+	}
+	found := false
+	for _, w := range preview.Warnings {
+		if w == "Config currently disables `order place --side sell`." {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected sell-disabled warning in preview, got %v", preview.Warnings)
+	}
+}
+
+func TestPreviewPlaceSellEnabled(t *testing.T) {
+	dir := t.TempDir()
+	permissionService := permissions.NewService(filepath.Join(dir, "permission.json"))
+
+	service := NewService(permissionService, config.Trading{
+		Place:                 true,
+		Sell:                  true,
+		AllowLiveOrderActions: true,
+	}, nil)
+	intent, err := orderintent.NormalizePlace(orderintent.PlaceInput{
+		Symbol:       "TSLL",
+		Market:       "us",
+		Side:         "sell",
+		OrderType:    "limit",
+		Quantity:     1,
+		Price:        500,
+		CurrencyMode: "KRW",
+	})
+	if err != nil {
+		t.Fatalf("NormalizePlace returned error: %v", err)
+	}
+
+	preview := service.PreviewPlace(intent)
+	if !preview.LiveReady {
+		t.Fatal("expected LiveReady to be true for sell")
+	}
+	if !preview.MutationReady {
+		t.Fatal("expected MutationReady to be true when sell is enabled")
+	}
+}
+
 func TestPlaceFailsWhenDangerousExecuteIsDisabledInConfig(t *testing.T) {
 	dir := t.TempDir()
 	permissionService := permissions.NewService(filepath.Join(dir, "permission.json"))

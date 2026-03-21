@@ -49,15 +49,22 @@ func NewService(permissionService *permissions.Service, policy config.Trading, b
 func (s *Service) PreviewPlace(intent orderintent.PlaceIntent) Preview {
 	canonical := orderintent.CanonicalPlace(intent)
 	warnings := []string{
-		"Live place currently supports only US buy limit orders in KRW, non-fractional mode.",
+		"Live place currently supports US buy/sell limit orders in KRW, non-fractional mode.",
 		"US orders may still require funding, FX consent, or product-risk acknowledgement before submission.",
 	}
 	liveReady := placeIntentSupported(intent)
 	if !s.policy.Place {
 		warnings = append(warnings, "Config currently disables `order place`.")
 	}
+	if intent.Side == "sell" && !s.policy.Sell {
+		warnings = append(warnings, "Config currently disables `order place --side sell`.")
+	}
 	if !s.policy.AllowLiveOrderActions {
 		warnings = append(warnings, "Config currently disables live order actions.")
+	}
+	mutationReady := liveReady && s.policy.Place && s.policy.AllowLiveOrderActions
+	if intent.Side == "sell" {
+		mutationReady = mutationReady && s.policy.Sell
 	}
 	return Preview{
 		Kind:          "place",
@@ -65,7 +72,7 @@ func (s *Service) PreviewPlace(intent orderintent.PlaceIntent) Preview {
 		ConfirmToken:  orderintent.ConfirmToken(canonical),
 		Warnings:      warnings,
 		LiveReady:     liveReady,
-		MutationReady: liveReady && s.policy.Place && s.policy.AllowLiveOrderActions,
+		MutationReady: mutationReady,
 	}
 }
 
@@ -116,6 +123,9 @@ func (s *Service) Place(ctx context.Context, intent orderintent.PlaceIntent, opt
 	}
 	if !placeIntentSupported(intent) {
 		return MutationResult{}, ErrPlaceUnsupported
+	}
+	if intent.Side == "sell" && !s.policy.Sell {
+		return MutationResult{}, &DisabledActionError{Action: "sell"}
 	}
 	if s.broker == nil {
 		return MutationResult{}, ErrLiveMutationPending
@@ -196,7 +206,6 @@ func (s *Service) requireActionEnabled(action Action) error {
 
 func placeIntentSupported(intent orderintent.PlaceIntent) bool {
 	return intent.Market == "us" &&
-		intent.Side == "buy" &&
 		intent.OrderType == "limit" &&
 		intent.CurrencyMode == "KRW" &&
 		!intent.Fractional

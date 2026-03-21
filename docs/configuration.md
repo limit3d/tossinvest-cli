@@ -27,6 +27,7 @@ tossctl config init
   "trading": {
     "grant": false,
     "place": false,
+    "sell": false,
     "cancel": false,
     "amend": false,
     "allow_live_order_actions": false,
@@ -45,6 +46,9 @@ tossctl config init
   - `tossctl order permissions grant` 허용 여부
 - `trading.place`
   - `tossctl order place` 허용 여부
+- `trading.sell`
+  - `tossctl order place --side sell` 허용 여부
+  - `trading.place`도 함께 켜야 매도 주문이 가능합니다
 - `trading.cancel`
   - `tossctl order cancel` 허용 여부
 - `trading.amend`
