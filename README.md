@@ -192,6 +192,33 @@ tossctl config show
 - `amend` interactive auth branch 정리
 - `시장가`, `소수점 주문`
 
+## MCP Server (AI Agent 연동)
+
+`tossctl-mcp`는 읽기 전용 MCP (Model Context Protocol) 서버입니다. Claude, Cursor, Codex 같은 AI 에이전트가 토스증권 데이터를 직접 조회할 수 있습니다.
+
+```json
+{
+  "mcpServers": {
+    "tossinvest": {
+      "command": "tossctl-mcp"
+    }
+  }
+}
+```
+
+제공하는 도구:
+
+| 도구 | 설명 |
+|------|------|
+| `get_portfolio_positions` | 보유 포지션 조회 |
+| `get_account_summary` | 계좌 요약 (총자산, 수익률, 주문가능금액) |
+| `get_quote` | 종목 시세 조회 (US/KR) |
+| `list_pending_orders` | 미체결 주문 목록 |
+| `list_completed_orders` | 체결 완료 내역 |
+| `list_watchlist` | 관심 종목 |
+
+거래 기능은 MCP에 노출되지 않습니다 — 읽기 전용입니다.
+
 ## 이 프로젝트가 하지 않는 것
 
 | 하지 않는 것 | 설명 |

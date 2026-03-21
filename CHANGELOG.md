@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-03-21
+
+### Added
+- **MCP server** (`tossctl-mcp`) — read-only Model Context Protocol server for AI agent integration
+  - `get_portfolio_positions` — 보유 포지션 조회
+  - `get_account_summary` — 계좌 요약 조회
+  - `get_quote` — 종목 시세 조회 (US/KR)
+  - `list_pending_orders` — 미체결 주문 조회
+  - `list_completed_orders` — 체결 완료 내역 조회 (market filter 지원)
+  - `list_watchlist` — 관심 종목 조회
+- `tossctl export positions` — CSV 포지션 내보내기 (stub에서 실제 구현으로 전환)
+- `tossctl export orders` — CSV 체결 내역 내보내기 (stub에서 실제 구현으로 전환)
+- `make build-mcp` Makefile 타겟
+- Release workflow에 `tossctl-mcp` 바이너리 포함
+
 ## [0.1.7] - 2026-03-21
 
 ### Added

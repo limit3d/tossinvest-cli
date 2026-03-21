@@ -6,11 +6,15 @@ LDFLAGS := -X github.com/junghoonkye/tossinvest-cli/internal/version.Version=$(V
 	-X github.com/junghoonkye/tossinvest-cli/internal/version.Commit=$(COMMIT) \
 	-X github.com/junghoonkye/tossinvest-cli/internal/version.Date=$(DATE)
 
-.PHONY: build run test fmt tidy clean
+.PHONY: build build-mcp run test fmt tidy clean
 
 build:
 	mkdir -p bin
 	go build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/tossctl
+
+build-mcp:
+	mkdir -p bin
+	go build -ldflags "$(LDFLAGS)" -o bin/tossctl-mcp ./cmd/tossctl-mcp
 
 run:
 	go run -ldflags "$(LDFLAGS)" ./cmd/tossctl

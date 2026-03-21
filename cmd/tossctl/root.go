@@ -80,7 +80,7 @@ func newRootCmd() *cobra.Command {
 		newWatchlistCmd(opts),
 		newQuoteCmd(opts),
 		newOrderCmd(opts),
-		newExportCmd(),
+		newExportCmd(opts),
 	)
 
 	return cmd
