@@ -21,3 +21,6 @@
 
 /fixtures/raw/
 /docs/plans/
+
+/.gstack/
+/.emdash.json

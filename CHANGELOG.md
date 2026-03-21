@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-03-21
+
+### Added
+- MCP server unit tests (10 test cases) covering initialize, tools/list, tool calls, error handling
+- Refactored MCP server to testable pure functions (handleMethod, buildInitializeResponse, buildToolsList)
+
+### Removed
+- Unused `stub.go` command helper (export commands now fully implemented)
+
 ## [0.2.0] - 2026-03-21
 
 ### Added
