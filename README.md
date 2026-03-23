@@ -236,23 +236,24 @@ tossctl quote batch TSLL 005930 GOOG VOO --output table
 
 ## 설치
 
-지원 플랫폼: macOS (arm64/amd64), Linux (amd64/arm64), Windows (amd64).
+<details>
+<summary>Homebrew, Windows, 소스 빌드 등 다른 설치 방법</summary>
 
-### Homebrew (macOS)
+#### Homebrew (macOS)
 
 ```bash
 brew tap JungHoonGhae/tossinvest-cli
 brew install tossctl
 ```
 
-### Windows (PowerShell)
+#### Windows (PowerShell)
 
 ```powershell
 Invoke-WebRequest -Uri https://github.com/JungHoonGhae/tossinvest-cli/releases/latest/download/tossctl-windows-amd64.zip -OutFile tossctl.zip
 Expand-Archive tossctl.zip -DestinationPath .
 ```
 
-### From source
+#### From source
 
 ```bash
 git clone https://github.com/JungHoonGhae/tossinvest-cli.git
@@ -263,6 +264,8 @@ cd auth-helper
 python3 -m pip install -e .
 python3 -m playwright install chromium
 ```
+
+</details>
 
 ## 명령 표면
 
