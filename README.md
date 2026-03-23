@@ -348,6 +348,16 @@ US/KR 지정가 매수/매도, US 소수점 매수, 당일 미체결 취소가 l
   <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50">
 </a>
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=JungHoonGhae%2Ftossinvest-cli&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=JungHoonGhae/tossinvest-cli&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=JungHoonGhae/tossinvest-cli&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=JungHoonGhae/tossinvest-cli&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## License
 
 MIT
