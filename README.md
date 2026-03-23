@@ -58,10 +58,31 @@
 
 ### For Human
 
+#### macOS (Homebrew)
+
 ```bash
 brew tap JungHoonGhae/tossinvest-cli
 brew install tossctl
+```
 
+#### Linux
+
+```bash
+curl -LO https://github.com/JungHoonGhae/tossinvest-cli/releases/latest/download/tossctl-linux-amd64.tar.gz
+tar xzf tossctl-linux-amd64.tar.gz
+sudo mv tossctl /usr/local/bin/
+```
+
+#### Windows (PowerShell)
+
+```powershell
+Invoke-WebRequest -Uri https://github.com/JungHoonGhae/tossinvest-cli/releases/latest/download/tossctl-windows-amd64.zip -OutFile tossctl.zip
+Expand-Archive tossctl.zip -DestinationPath .
+```
+
+#### 설치 확인 및 로그인
+
+```bash
 tossctl version
 tossctl doctor
 tossctl config show
@@ -70,19 +91,19 @@ tossctl auth login
 tossctl account summary --output json
 ```
 
-`auth login`까지 쓰려면 Homebrew Python에 Playwright와 Chromium을 준비해야 합니다.
+`auth login`은 Playwright 기반 브라우저 로그인이 필요합니다.
 
 ```bash
-PY="$(brew --prefix python@3.11)/bin/python3.11"
-"$PY" -m pip install playwright
-"$PY" -m playwright install chromium
+python3 -m pip install playwright
+python3 -m playwright install chromium
 ```
 
 ### For Agent
 
 ```text
-Install tossinvest-cli with Homebrew, run `tossctl doctor` and `tossctl auth doctor`,
-complete browser login with `tossctl auth login`, then use read-only commands first.
+Install tossinvest-cli: Homebrew (macOS), GitHub Releases (Linux/Windows).
+Run `tossctl doctor` and `tossctl auth doctor`, complete browser login with
+`tossctl auth login`, then use read-only commands first.
 Trading actions stay disabled until config.json explicitly allows them.
 Only use `tossctl order preview` before any trading mutation.
 ```
@@ -235,27 +256,7 @@ tossctl quote batch TSLL 005930 GOOG VOO --output table
 
 ## 설치
 
-### Homebrew
-
-```bash
-brew tap JungHoonGhae/tossinvest-cli
-brew install tossctl
-```
-
-### Windows / Linux
-
-GitHub Releases에서 바이너리를 직접 다운로드할 수 있습니다.
-
-```bash
-# Linux (amd64)
-curl -LO https://github.com/JungHoonGhae/tossinvest-cli/releases/latest/download/tossctl-linux-amd64.tar.gz
-tar xzf tossctl-linux-amd64.tar.gz
-sudo mv tossctl /usr/local/bin/
-
-# Windows (amd64) — PowerShell
-Invoke-WebRequest -Uri https://github.com/JungHoonGhae/tossinvest-cli/releases/latest/download/tossctl-windows-amd64.zip -OutFile tossctl.zip
-Expand-Archive tossctl.zip -DestinationPath .
-```
+플랫폼별 설치 방법은 [Quick Start](#quick-start)를 참고하세요. 지원 플랫폼: macOS (arm64/amd64), Linux (amd64/arm64), Windows (amd64).
 
 ### From source
 

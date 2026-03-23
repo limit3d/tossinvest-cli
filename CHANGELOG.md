@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2026-03-23
+
+### Added
+- **Cross-platform release builds** — Windows (amd64), Linux (amd64/arm64) 바이너리 자동 빌드
+- Quick Start에 Windows/Linux 설치 가이드 추가
+
+### Changed
+- README Quick Start를 macOS/Linux/Windows 플랫폼별로 재구성
+- 설치 섹션 중복 제거, Quick Start로 통합
+
+### Docs
+- architecture.md 갭 목록 업데이트 — sell, KR, fractional 구현 완료 반영
+- README disclaimer 강화 (TOS 위반 가능성 명시)
+
 ## [0.3.1] - 2026-03-21
 
 ### Fixed
