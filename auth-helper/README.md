@@ -22,8 +22,9 @@ The helper exists to isolate browser automation from the main CLI.
 ```bash
 cd auth-helper
 python3 -m pip install -e .
-python3 -m playwright install chromium
 python3 -m tossctl_auth_helper login --storage-state /tmp/tossctl-storage-state.json
 ```
+
+> Google Chrome이 시스템에 설치되어 있어야 합니다. `playwright install chromium`은 더 이상 필요하지 않습니다.
 
 The helper emits JSON on stdout. On success it returns `status=ok` and the path of the saved Playwright storage-state file.

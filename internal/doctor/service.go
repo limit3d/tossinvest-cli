@@ -131,7 +131,7 @@ func (s *Service) RunAuth(ctx context.Context) (AuthReport, error) {
 		checkPath("auth_helper_dir", s.loginConfig.HelperDir),
 		checkPythonModule(s.loginConfig, "tossctl_auth_helper", "auth helper module is importable", "auth helper module is not importable"),
 		checkPythonModule(s.loginConfig, "playwright", "python playwright package is installed", "python playwright package is not installed"),
-		checkChromium(s.loginConfig),
+		checkChrome(s.loginConfig),
 		checkSession(sessionStatus),
 	}
 
@@ -219,62 +219,53 @@ func checkPythonModule(cfg auth.LoginConfig, module, successSummary, failSummary
 	}
 }
 
-func checkChromium(cfg auth.LoginConfig) Check {
+func checkChrome(cfg auth.LoginConfig) Check {
 	path, err := exec.LookPath(cfg.PythonBin)
 	if err != nil {
 		return Check{
-			Name:    "chromium",
+			Name:    "chrome",
 			Status:  CheckFail,
-			Summary: "chromium check skipped because python is unavailable",
+			Summary: "chrome check skipped because python is unavailable",
 		}
 	}
 
-	script := `import os
+	script := `import json, subprocess, sys
 from playwright.sync_api import sync_playwright
 p = sync_playwright().start()
-chromium_path = p.chromium.executable_path
-p.stop()
-if chromium_path and os.path.exists(chromium_path):
-    print(chromium_path)
+try:
+    b = p.chromium.launch(headless=True, channel="chrome")
+    ua = b.new_page().evaluate("navigator.userAgent")
+    b.close()
+    print(ua)
+except Exception as e:
+    print("ERROR:" + str(e), file=sys.stderr)
+    sys.exit(1)
+finally:
+    p.stop()
 `
 	cmd := exec.Command(path, "-c", script)
 	cmd.Dir = cfg.HelperDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return Check{
-			Name:    "chromium",
-			Status:  CheckWarn,
-			Summary: "playwright chromium is not ready",
-			Detail:  chromiumFailureDetail(string(output)),
+		detail := strings.TrimSpace(string(output))
+		if strings.Contains(detail, "Executable doesn't exist") || strings.Contains(detail, "channel") {
+			detail = "Google Chrome is not installed. Install from https://www.google.com/chrome/"
 		}
-	}
-	chromiumPath := strings.TrimSpace(string(output))
-	if chromiumPath == "" {
 		return Check{
-			Name:    "chromium",
+			Name:    "chrome",
 			Status:  CheckWarn,
-			Summary: "playwright chromium is not ready",
-			Detail:  fmt.Sprintf("Run `%s -m playwright install chromium`.", cfg.PythonBin),
+			Summary: "Google Chrome is not available via Playwright",
+			Detail:  firstLine(detail),
 		}
 	}
 
+	ua := strings.TrimSpace(string(output))
 	return Check{
-		Name:    "chromium",
+		Name:    "chrome",
 		Status:  CheckOK,
-		Summary: "playwright chromium is installed",
-		Detail:  chromiumPath,
+		Summary: "Google Chrome is available",
+		Detail:  ua,
 	}
-}
-
-func chromiumFailureDetail(output string) string {
-	detail := strings.TrimSpace(output)
-	if detail == "" {
-		return "Run `python3 -m playwright install chromium`."
-	}
-	if strings.Contains(detail, "Executable doesn't exist") {
-		return "Run `python3 -m playwright install chromium`."
-	}
-	return firstLine(detail)
 }
 
 func firstLine(value string) string {
