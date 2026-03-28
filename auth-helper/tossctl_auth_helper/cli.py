@@ -82,7 +82,7 @@ def command_login(args: argparse.Namespace) -> int:
         return emit(
             {
                 "status": "error",
-                "message": "python package 'playwright' is required. Install it with 'pip install playwright' and then run 'python -m playwright install chromium'.",
+                "message": "python package 'playwright' is required. Install it with 'pip install playwright'. Google Chrome must also be installed on your system.",
             }
         )
 
@@ -91,7 +91,7 @@ def command_login(args: argparse.Namespace) -> int:
 
     try:
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=False)
+            browser = playwright.chromium.launch(headless=False, channel="chrome")
             context = browser.new_context()
             page = context.new_page()
             log("Opened browser for Toss Securities login.")
@@ -143,7 +143,8 @@ def command_login(args: argparse.Namespace) -> int:
         message = str(exc)
         if "Executable doesn't exist" in message:
             message = (
-                "Playwright browser is not installed. Run 'python -m playwright install chromium' and try again."
+                "Google Chrome is not installed or could not be found. "
+                "Install Chrome from https://www.google.com/chrome/ and try again."
             )
         return emit({"status": "error", "message": message})
 
