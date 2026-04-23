@@ -198,6 +198,9 @@ func buildPlaceCommand(kind string, flags *placeFlags, confirm string) string {
 	if flags.fractional {
 		args = append(args, "--fractional")
 	}
+	if flags.max {
+		args = append(args, "--max")
+	}
 	if kind == "place" {
 		args = append(args, "--execute", "--dangerously-skip-permissions", "--confirm", confirm)
 	}

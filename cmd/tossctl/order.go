@@ -25,6 +25,7 @@ type placeFlags struct {
 	amount       float64
 	currencyMode string
 	fractional   bool
+	max          bool
 }
 
 type executeFlags struct {
@@ -130,6 +131,7 @@ func newOrderPreviewCmd(opts *rootOptions) *cobra.Command {
 				Amount:       flags.amount,
 				CurrencyMode: flags.currencyMode,
 				Fractional:   flags.fractional,
+				Max:          flags.max,
 			})
 			if err != nil {
 				return err
@@ -166,6 +168,7 @@ func newOrderPlaceCmd(opts *rootOptions) *cobra.Command {
 				Amount:       place.amount,
 				CurrencyMode: place.currencyMode,
 				Fractional:   place.fractional,
+				Max:          place.max,
 			})
 			if err != nil {
 				return err
@@ -423,6 +426,7 @@ func bindPlaceFlags(cmd *cobra.Command, flags *placeFlags) {
 	cmd.Flags().Float64Var(&flags.amount, "amount", 0, "Order amount in KRW for fractional orders")
 	cmd.Flags().StringVar(&flags.currencyMode, "currency-mode", flags.currencyMode, "Currency mode")
 	cmd.Flags().BoolVar(&flags.fractional, "fractional", false, "Whether the order is fractional (US market order, amount-based)")
+	cmd.Flags().BoolVar(&flags.max, "max", false, "Sell all shares (전량 매도)")
 	if err := cmd.MarkFlagRequired("symbol"); err != nil {
 		panic(err)
 	}

@@ -54,7 +54,7 @@ This file is the source of truth for endpoint discovery. It should grow before t
 | `public` | `GET` | `wts-info-api.tossinvest.com` | `/api/v1/dashboard/wts/overview/exchange-rates` | exchange-rate summary | object under `.result` | none | may support quote context |
 | `public` | `GET` | `wts-cert-api.tossinvest.com` | `/api/v1/dashboard/wts/overview/indicator/index?market=kr` | market indicators | `.result.majorIndicatorInfos` | none | public page dependency |
 | `public` | `GET` | `wts-cert-api.tossinvest.com` | `/api/v1/dashboard/wts/overview/calendar/economic-events` | calendar snippets | object under `.result` | none | public page dependency |
-| `public` | `POST` | `wts-cert-api.tossinvest.com` | `/api/v2/dashboard/wts/overview/ranking` | overview ranking widgets | object under `.result` | none | body contract still needs capture |
+| `public` | `POST` | `wts-cert-api.tossinvest.com` | `/api/v2/dashboard/wts/overview/ranking` | overview ranking widgets | `.result.products[]` with `rank`, `productCode`, `name`, `price{base,close,baseKrw,closeKrw,marketVolume,marketAmount}`, `extraInfo{tossSecuritiesBuy,tossSecuritiesSell}` | `toss_snapshot.py` | body: `{"id":"heavy_soar","filters":[],"duration":"1d","tag":"us"}`. Known IDs: `heavy_soar` (급상승), `biggest_total_amount` (거래대금). productCode→symbol resolution via `/api/v1/stock-infos?codes=...` |
 | `public` | `POST` | `wts-info-api.tossinvest.com` | `/api/v1/dashboard/intelligences/all` | dashboard cards | object under `.result` | none | body contract still needs capture |
 | `public` | `POST` | `wts-info-api.tossinvest.com` | `/api/v2/dashboard/wts/overview/signals` | signal cards on stock detail/home | object under `.result` | none | body contract still needs capture |
 

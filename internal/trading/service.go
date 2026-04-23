@@ -237,9 +237,12 @@ func placeIntentSupported(intent orderintent.PlaceIntent) bool {
 		return intent.Market == "us" && intent.OrderType == "market" &&
 			(intent.CurrencyMode == "KRW" || intent.CurrencyMode == "USD")
 	}
-	// non-fractional: KRW only, limit only
 	if intent.CurrencyMode != "KRW" {
 		return false
+	}
+	// US market orders allowed (e.g. selling fractional qty at market price)
+	if intent.Market == "us" && intent.OrderType == "market" {
+		return true
 	}
 	return intent.OrderType == "limit"
 }

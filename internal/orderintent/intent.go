@@ -20,6 +20,7 @@ type PlaceIntent struct {
 	Amount       float64 `json:"amount,omitempty"`
 	CurrencyMode string  `json:"currency_mode"`
 	Fractional   bool    `json:"fractional"`
+	Max          bool    `json:"max"` // 전량 매도 (소수점 포함)
 }
 
 type CancelIntent struct {
@@ -47,6 +48,7 @@ type PlaceInput struct {
 	Amount       float64
 	CurrencyMode string
 	Fractional   bool
+	Max          bool
 }
 
 func NormalizePlace(input PlaceInput) (PlaceIntent, error) {
@@ -77,6 +79,7 @@ func NormalizePlace(input PlaceInput) (PlaceIntent, error) {
 		Amount:       input.Amount,
 		CurrencyMode: normalizeCurrencyMode(input.CurrencyMode),
 		Fractional:   fractional,
+		Max:          input.Max,
 	}
 
 	if intent.Market == "us" && looksLikeKRSymbol(intent.Symbol) {
@@ -155,6 +158,7 @@ func CanonicalPlace(intent PlaceIntent) string {
 		"currency_mode": intent.CurrencyMode,
 		"fractional":    strconv.FormatBool(intent.Fractional),
 		"market":        intent.Market,
+		"max":           strconv.FormatBool(intent.Max),
 		"order_type":    intent.OrderType,
 		"price":         formatFloat(intent.Price),
 		"amount":        formatFloat(intent.Amount),

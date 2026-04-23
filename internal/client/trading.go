@@ -825,9 +825,16 @@ func buildPlaceBody(productCode, marketCode string, intent orderintent.PlaceInte
 	} else if intent.Market == "kr" {
 		priceValue = intent.Price
 		quantityValue = intent.Quantity
+		if intent.OrderType == "market" {
+			orderPriceType = "01"
+		}
 	} else {
 		priceValue = round2(intent.Price / meta.ExchangeRate)
 		quantityValue = intent.Quantity
+		if intent.OrderType == "market" {
+			orderPriceType = "01"
+			priceValue = 0
+		}
 	}
 
 	payload := map[string]any{
@@ -841,7 +848,7 @@ func buildPlaceBody(productCode, marketCode string, intent orderintent.PlaceInte
 		"orderPriceType":         orderPriceType,
 		"agreedOver100Million":   false,
 		"marginTrading":          false,
-		"max":                    false,
+		"max":                    intent.Max,
 		"isReservationOrder":     false,
 		"openPriceSinglePriceYn": false,
 	}

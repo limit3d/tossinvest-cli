@@ -318,6 +318,12 @@ func (c *Client) applySession(req *http.Request) {
 		req.Header.Set("User-Agent", defaultBrowserUserAgent)
 	}
 
+	// Toss checks Sec-Ch-Ua for "Google Chrome" brand — mimic real Chrome headers
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36")
+	req.Header.Set("Sec-Ch-Ua", `"Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"`)
+	req.Header.Set("Sec-Ch-Ua-Mobile", "?0")
+	req.Header.Set("Sec-Ch-Ua-Platform", `"macOS"`)
+
 	if c.session == nil {
 		return
 	}
